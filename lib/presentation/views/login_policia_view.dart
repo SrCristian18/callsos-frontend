@@ -61,14 +61,29 @@ class LoginPoliciaView extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
             
+
+
             //Recuperar contraseña
-            Align(
-              alignment: Alignment.center,
-              child: TextButton(
-                onPressed: () {},
-                child: const Text("¿Has olvidado tu contraseña?", style: TextStyle(color: AppColors.verdeClaro)),
-              ),
-            ),
+            Center(
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click, // Esto pone la "manito" al pasar el mouse
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(5), // Para que el efecto visual no sea cuadrado
+                  onTap: () => Navigator.pushNamed(context, '/forgot_password'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0), // Aumenta el área de clic
+                    child: Text(
+                      "¿Has olvidado tu contraseña?",
+                      style: TextStyle(
+                        color: const Color(0xFF4CAF50), // Tu verde esmeralda
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+          ),
+        ),
+      ),
+    ),
+  ),
+),
               const SizedBox(height: 20),
             ],
           ),
