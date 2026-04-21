@@ -10,36 +10,38 @@ class LoginView extends StatefulWidget {
 }
 
 class _LoginViewState extends State<LoginView> {
-
-  @override
   Widget build(BuildContext context) {
     final viewModel = Provider.of<LoginViewModel>(context);
 
     return Scaffold(
       backgroundColor: AppColors.blancoVerde,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.verdeOscuro),
+          onPressed: () => Navigator.pop(context), 
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(30.0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back_ios, color: AppColors.negroTexto),
-                onPressed: () => Navigator.pop(context),
-              ),
               const SizedBox(height: 40),
               const Text(
-                "¡BIENVENIDO!",
+                "Bienvenido",
                 style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.verdeOscuro),
               ),
               const Text(
-                "DENUNCIANTE",
+                "Denunciante",
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300, color: AppColors.negroTexto),
               ),
-              const SizedBox(height: 50),
+              const SizedBox(height: 20),
               
               CustomInput(
-                hintText: "Username or Email",
+                hintText: "Email",
                 icon: Icons.person_outline,
                 controller: viewModel.userController,
               ),
@@ -49,15 +51,7 @@ class _LoginViewState extends State<LoginView> {
                 isPassword: true,
                 controller: viewModel.passwordController,
               ),
-              
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {},
-                  child: const Text("¿Has olvidado tu contraseña?", style: TextStyle(color: AppColors.verdeClaro)),
-                ),
-              ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 10),
               
               // Botón de Iniciar Sesión
               SizedBox(
@@ -65,26 +59,42 @@ class _LoginViewState extends State<LoginView> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.negroTexto, // El color oscuro de tus botones
-                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                   ),
                   onPressed: () => viewModel.login(context),
-                  child: const Text("Iniciar Sesión", style: TextStyle(color: Colors.white, fontSize: 18)),
+                  child: const Text("Iniciar sesión", style: TextStyle(color: Colors.white, fontSize: 18)),
                 ),
               ),
-              
-              const SizedBox(height: 80),
-              Center(
-                child: Column(
-                  children: [
-                    const Text("¿Todavía no tienes una cuenta?"),
-                    TextButton(
-                      onPressed: () {},
-                      child: const Text("Regístrate ahora", style: TextStyle(color: AppColors.verdeOscuro, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-              )
+              const SizedBox(height: 14),
+
+
+
+              //Recuperar contraseña
+            Center(
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click, // Esto pone la "manito" al pasar el mouse
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(5), // Para que el efecto visual no sea cuadrado
+                  onTap: () => Navigator.pushNamed(context, '/forgot_password'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0), // Aumenta el área de clic
+                    child: Text(
+                      "¿Has olvidado tu contraseña?",
+                      style: TextStyle(
+                        color: const Color(0xFF4CAF50), // Tu verde esmeralda
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+          ),
+        ),
+      ),
+    ),
+  ),
+),
+
+
+
+
             ],
           ),
         ),

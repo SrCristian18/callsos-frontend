@@ -5,12 +5,13 @@ class CustomInput extends StatelessWidget {
   final String hintText;
   final IconData icon;
   final bool isPassword;
-  final TextEditingController controller;
+  final TextEditingController? controller;
 
   const CustomInput({
+    super.key,
     required this.hintText,
     required this.icon,
-    required this.controller,
+    this.controller,
     this.isPassword = false,
   });
 
@@ -26,14 +27,14 @@ class CustomInput extends StatelessWidget {
         ],
       ),
       child: TextField(
-        controller: controller,
+        controller: controller ?? TextEditingController(),
         obscureText: isPassword,
         decoration: InputDecoration(
           hintText: hintText,
           prefixIcon: Icon(icon, color: AppColors.verdeClaro),
           suffixIcon: isPassword ? Icon(Icons.visibility_off_outlined) : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 15),
+          contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
         ),
       ),
     );
