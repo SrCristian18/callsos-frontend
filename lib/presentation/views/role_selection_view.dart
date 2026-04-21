@@ -1,4 +1,6 @@
+import 'package:CallSos/presentation/viewmodels/login_viewmodel.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/colores_app.dart';
 
 class RoleSelectionView extends StatelessWidget {
@@ -15,25 +17,31 @@ class RoleSelectionView extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Text(
-                "IDENTIFÍCATE",
+                "¿Quién eres?",
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.verdeOscuro),
               ),
               const SizedBox(height: 40),
               
               // Tarjeta Denunciante
               _RoleCard(
-                title: "DENUNCIANTE",
+                title: "Denunciante",
                 icon: Icons.person_search,
-                onTap: () => Navigator.pushNamed(context, '/welcome', arguments: 'denunciante'),
+                onTap: () {
+                  Provider.of<LoginViewModel>(context, listen: false).resetForm();
+                  Navigator.pushNamed(context, '/welcome', arguments: 'denunciante');
+                },
               ),
               
               const SizedBox(height: 20),
               
               // Tarjeta Policía
               _RoleCard(
-                title: "POLICÍA / CAI",
+                title: "Agente de policía / CAI",
                 icon: Icons.local_police,
-                onTap: () => Navigator.pushNamed(context, '/welcome', arguments: 'policia'),
+                onTap: () {
+                  Provider.of<LoginViewModel>(context, listen: false).resetForm();  
+                  Navigator.pushNamed(context, '/welcome', arguments: 'policia');
+                },
               ),
             ],
           ),
