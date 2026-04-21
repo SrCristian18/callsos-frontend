@@ -17,6 +17,14 @@ class _LoginViewState extends State<LoginView> {
 
     return Scaffold(
       backgroundColor: AppColors.blancoVerde,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.verdeOscuro),
+          onPressed: () => Navigator.pop(context), 
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(30.0),
@@ -29,17 +37,17 @@ class _LoginViewState extends State<LoginView> {
               ),
               const SizedBox(height: 40),
               const Text(
-                "¡BIENVENIDO!",
+                "¡Bienvenido!",
                 style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.verdeOscuro),
               ),
               const Text(
-                "DENUNCIANTE",
+                "Denunciante",
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300, color: AppColors.negroTexto),
               ),
               const SizedBox(height: 50),
               
               CustomInput(
-                hintText: "Username or Email",
+                hintText: "Nombre de usuario o Email",
                 icon: Icons.person_outline,
                 controller: viewModel.userController,
               ),
