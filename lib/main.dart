@@ -1,9 +1,12 @@
+import 'package:CallSos/presentation/viewmodels/policia_viewmodel.dart';
 import 'package:CallSos/presentation/views/forgot_password_view.dart';
 import 'package:CallSos/presentation/views/login_policia_view.dart';
 import 'package:CallSos/presentation/views/register_denunciante_view.dart';
 import 'package:CallSos/presentation/views/register_policia_view.dart';
 import 'package:CallSos/presentation/views/role_selection_view.dart';
 import 'package:CallSos/presentation/views/welcome_view.dart';
+import 'package:CallSos/presentation/views/home_denunciante_view.dart';
+import 'package:CallSos/presentation/views/home_policia_view.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'presentation/views/login_view.dart';
@@ -19,6 +22,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => LoginViewModel()),
+        ChangeNotifierProvider(create: (_) => PoliciaViewModel()),
         ],
     child: MaterialApp(
       title: 'CallSOS',
@@ -36,6 +40,8 @@ class MyApp extends StatelessWidget {
           '/register_denunciante': (context) => RegisterDenuncianteView(),
           '/register_policia': (context) => RegisterPoliciaView(),
           '/forgot_password': (context) => ForgotPasswordView(),
+          '/home_denunciante': (context) => HomeDenuncianteView(),
+          '/home_policia': (context) => HomePoliciaView(),
         },
       ),
     );
