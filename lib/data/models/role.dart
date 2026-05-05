@@ -1,0 +1,6 @@
+enum Role {
+  COMANDO,
+  JEFECAI,
+  AGENTE_POLICIA,
+  DENUNCIANTE,
+}

@@ -29,7 +29,7 @@ class LoginViewModel extends ChangeNotifier {
     _isLoading = false;
     notifyListeners();
     
-    print("Login exitoso para: ${userController.text}");
+    print("Inicio de sesión exitoso para: ${userController.text}");
   }
 
   void resetForm(){
