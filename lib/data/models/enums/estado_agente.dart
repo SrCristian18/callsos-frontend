@@ -1,0 +1,5 @@
+enum EstadoAgente{
+  DISPONIBLE,
+  OCUPADO,
+  NO_DISPONIBLE
+}

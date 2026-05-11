@@ -1,0 +1,5 @@
+enum Rol{
+  COMANDO,
+  JEFE_CAI,
+  AGENTE_POLICIA
+}

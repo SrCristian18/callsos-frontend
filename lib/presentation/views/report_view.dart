@@ -1,155 +1,490 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:CallSos/core/colores_app.dart';
-import 'package:CallSos/presentation/viewmodels/incident_viewmodel.dart';
-import 'package:CallSos/data/models/incident.dart';
-import 'package:CallSos/data/models/incident_type.dart'; // Importa el nuevo modelo
+import 'package:CallSos/data/models/enums/estado_incidente.dart';
+import 'package:CallSos/presentation/viewmodels/incidente_viewmodel.dart';
+import 'package:flutter/material.dart';
 
-class ReportView extends StatelessWidget {
+class ReportView extends StatefulWidget {
   const ReportView({super.key});
 
   @override
+  State<ReportView> createState() => _ReportView();
+}
+
+class _ReportView extends State<ReportView> {
+  final vm = IncidenteViewModel();
+
+  @override
   Widget build(BuildContext context) {
-    final vm = context.watch<IncidentViewModel>();
+    return Scaffold(
+      backgroundColor: AppColors.blancoVerde,
+      body: SafeArea(
+        child: AnimatedBuilder(
+          animation: vm,
+          builder: (_, __) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        backgroundColor: AppColors.blancoVerde,
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF1B2A3B),
-          elevation: 0,
-          title: const Text("CallSOS - Auxilio", style: TextStyle(color: Colors.white)),
-          bottom: const TabBar(
-            indicatorColor: Colors.greenAccent,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            tabs: [
-              Tab(icon: Icon(Icons.add_alert), text: "Reportar"),
-              Tab(icon: Icon(Icons.history), text: "Mis Reportes"),
-            ],
-          ),
-        ),
-        body: TabBarView(
-          children: [
-            _buildReportarSection(context, vm),
-            _buildHistorialSection(vm),
-          ],
+                  /// HEADER
+                  _buildHeader(),
+
+                  const SizedBox(height: 14),
+
+                  /// TABS
+                  _buildTabs(),
+
+                  const SizedBox(height: 14),
+
+                  /// CONTENIDO
+                  Expanded(
+                    child: vm.currentIndex == 0
+                        ? _buildIncidentes()
+                        : _buildReportados(),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  /// FOOTER
+                  _buildBottomButtons(),
+
+                  const SizedBox(height: 12),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  // SECCIÓN 1: GRILLA DE REPORTES (Corregida con IncidentType)
-  Widget _buildReportarSection(BuildContext context, IncidentViewModel vm) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(20),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 15,
-        mainAxisSpacing: 15,
-        childAspectRatio: 1,
+  /// =====================================================
+  /// HEADER
+  /// =====================================================
+
+  Widget _buildHeader() {
+    return Container(
+      height: 54,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.negroTexto,
+        borderRadius: BorderRadius.circular(18),
       ),
-      itemCount: vm.catalogTypes.length, // Usamos la lista de objetos
-      itemBuilder: (context, index) {
-        final IncidentType type = vm.catalogTypes[index]; // Objeto tipado
-        return InkWell(
-          onTap: () => _confirmarEnvio(context, type),
-          child: Container(
-            decoration: BoxDecoration(
+      child: Row(
+        children: [
+          const CircleAvatar(
+            radius: 15,
+            backgroundColor: Colors.white24,
+            child: Icon(
+              Icons.person,
+              size: 18,
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5)],
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(type.icon, size: 50, color: type.color), // Acceso por propiedad .
-                const SizedBox(height: 10),
-                Text(type.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-              ],
             ),
           ),
-        );
-      },
-    );
-  }
+          const SizedBox(width: 10),
 
-  // SECCIÓN 2: HISTORIAL (Asegúrate que vm.misReportes devuelva List<Incident>)
-  Widget _buildHistorialSection(IncidentViewModel vm) {
-    final reportes = vm.allIncidents;
-
-    if (reportes.isEmpty) {
-      return const Center(child: Text("Aún no has realizado reportes."));
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(15),
-      itemCount: reportes.length,
-      itemBuilder: (context, index) {
-        final item = reportes[index];
-        return Card(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          child: ListTile(
-            leading: _buildStatusIcon(item.status),
-            title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text("Estado: ${_formatStatus(item.status)}"),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildStatusIcon(IncidentStatus status) {
-    Color color;
-    switch (status) {
-      case IncidentStatus.RECIBIDO: color = Colors.orange; break;
-      case IncidentStatus.CAI_ASIGNADO: color = Colors.blue; break;
-      case IncidentStatus.COMPLETADO: color = Colors.green; break;
-      default: color = Colors.grey;
-    }
-    return CircleAvatar(
-      backgroundColor: color.withOpacity(0.2), 
-      child: Icon(Icons.info, color: color, size: 20)
-    );
-  }
-
-  String _formatStatus(IncidentStatus status) {
-    return status.toString().split('.').last.replaceAll('_', ' ');
-  }
-
-  void _confirmarEnvio(BuildContext context, IncidentType type) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("¿Reportar ${type.title}?"),
-        content: const Text("Se enviará tu ubicación actual al comando de policía para asignar el CAI más cercano."),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context), 
-            child: const Text("Cancelar", style: TextStyle(color: Colors.grey))
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1B2A3B),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+          const Expanded(
+            child: Text(
+              "Usuario",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-            onPressed: () {
-              // Aquí disparas la lógica real del VM más adelante
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("Reporte de ${type.title} enviado"),
-                  backgroundColor: AppColors.verdeOscuro,
-                )
-              );
-            },
-            child: const Text("Enviar Reporte", style: TextStyle(color: Colors.white)),
+          ),
+
+          Icon(
+            Icons.notifications_none_rounded,
+            color: Colors.white.withOpacity(0.8),
           ),
         ],
       ),
+    );
+  }
+
+  /// =====================================================
+  /// TABS
+  /// =====================================================
+
+  Widget _buildTabs() {
+    return Container(
+      height: 46,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _tabItem(
+              title: "Denuncias",
+              selected: vm.currentIndex == 0,
+              onTap: () => vm.changeTab(0),
+            ),
+          ),
+          Expanded(
+            child: _tabItem(
+              title: "Estado",
+              selected: vm.currentIndex == 1,
+              onTap: () => vm.changeTab(1),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tabItem({
+    required String title,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.negroTexto
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Center(
+          child: Text(
+            title,
+            style: TextStyle(
+              color: selected
+                  ? Colors.white
+                  : AppColors.negroTexto,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// =====================================================
+  /// LISTA INCIDENTES
+  /// =====================================================
+
+  Widget _buildIncidentes() {
+    return ListView.separated(
+      itemCount: vm.incidentes.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (_, index) {
+        final incidente = vm.incidentes[index];
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            children: [
+              /// ICONO
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: incidente.color,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  incidente.icono,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              /// TEXTO
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      incidente.titulo,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: AppColors.negroTexto,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      incidente.descripcion,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              /// BOTON +
+              GestureDetector(
+                onTap: () {
+                  vm.agregarReporte(incidente);
+                },
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: AppColors.verdeClaro,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.add,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// =====================================================
+  /// REPORTADOS
+  /// =====================================================
+
+  Widget _buildReportados() {
+    if (vm.reportados.isEmpty) {
+      return const Center(
+        child: Text(
+          "No hay denuncias registradas",
+        ),
+      );
+    }
+
+    return ListView.separated(
+      itemCount: vm.reportados.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (_, index) {
+        final reporte = vm.reportados[index];
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            children: [
+              /// ICONO
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: reporte.incidente.color,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  reporte.incidente.icono,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              /// INFO
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      reporte.incidente.titulo,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.negroTexto,
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    Text(
+                      reporte.incidente.descripcion,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_month,
+                          size: 14,
+                          color: Colors.grey.shade600,
+                        ),
+
+                        const SizedBox(width: 4),
+
+                        Text(
+                          "${reporte.fechaCreacion.day}/${reporte.fechaCreacion.month}/${reporte.fechaCreacion.year}",
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+
+                        const SizedBox(width: 10),
+
+                        _estadoChip(reporte.estado),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              /// BOTON X
+              GestureDetector(
+                onTap: () {
+                  vm.eliminarReporte(reporte.id);
+                },
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// =====================================================
+  /// ESTADO CHIP
+  /// =====================================================
+
+  Widget _estadoChip(EstadoIncidente estado) {
+    Color color;
+    String texto;
+
+    switch (estado) {
+      case EstadoIncidente.PENDIENTE:
+        color = Colors.orange;
+        texto = "Pendiente";
+        break;
+
+      case EstadoIncidente.EN_PROCESO:
+        color = Colors.blue;
+        texto = "En proceso";
+        break;
+
+      case EstadoIncidente.RECIBIDO:
+        color = Colors.green;
+        texto = "Recibido";
+        break;
+      
+      case EstadoIncidente.CAI_ASIGNADO:
+        color = Colors.purple;
+        texto = "Cai asignado";
+        break;
+
+      case EstadoIncidente.AGENTE_ASIGNADO:
+        color = Colors.lightGreen;
+        texto = "Agente asignado";
+        break;
+      
+      case EstadoIncidente.COMPLETADO:
+        color = Colors.lightGreenAccent;
+        texto = "Completado";
+        break;
+
+      case EstadoIncidente.CANCELADO:
+        color = Colors.red;
+        texto = "Cancelado";
+        break;
+
+      case EstadoIncidente.INCOMPLETO:
+        color = Colors.blueGrey;
+        texto = "Incompleto";
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        texto,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  /// =====================================================
+  /// BOTTOM BUTTONS
+  /// =====================================================
+
+  Widget _buildBottomButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: () {},
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(
+                color: AppColors.verdeOscuro,
+              ),
+              foregroundColor: AppColors.negroTexto,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: const Text("Cancelar"),
+          ),
+        ),
+
+        const SizedBox(width: 12),
+
+        Expanded(
+          child: ElevatedButton(
+            onPressed: () {},
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.negroTexto,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: const Text("Agregar"),
+          ),
+        ),
+      ],
     );
   }
 }
