@@ -15,4 +15,8 @@ class AgentePolicia {
     required this.estadoAgente,
     this.cai,
   });
+
+  String get name => nombre;
+
+  String get caiName => cai ?? "Sin asignar";
 }

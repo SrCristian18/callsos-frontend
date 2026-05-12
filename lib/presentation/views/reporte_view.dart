@@ -1,17 +1,17 @@
 import 'package:CallSos/core/colores_app.dart';
 import 'package:CallSos/data/models/enums/estado_incidente.dart';
-import 'package:CallSos/presentation/viewmodels/incidente_viewmodel.dart';
+import 'package:CallSos/presentation/viewmodels/reporte_viewmodel.dart';
 import 'package:flutter/material.dart';
 
-class ReportView extends StatefulWidget {
-  const ReportView({super.key});
+class ReporteView extends StatefulWidget {
+  const ReporteView({super.key});
 
   @override
-  State<ReportView> createState() => _ReportView();
+  State<ReporteView> createState() => _ReporteView();
 }
 
-class _ReportView extends State<ReportView> {
-  final vm = IncidenteViewModel();
+class _ReporteView extends State<ReporteView> {
+  final vm = ReporteViewModel();
 
   @override
   Widget build(BuildContext context) {
