@@ -61,8 +61,6 @@ class LoginPoliciaView extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
             
-
-
             //Recuperar contraseña
             Center(
               child: MouseRegion(

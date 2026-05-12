@@ -53,7 +53,7 @@ class ForgotPasswordView extends StatelessWidget {
                   // Aquí iría la lógica para enviar el correo
 
                   //se vuelve al login
-                  Navigator.pop(context);
+                  //Navigator.pop(context);
                 },
                 child: const Text("Enviar", style: TextStyle(color: Colors.white, fontSize: 16)),
               ),
