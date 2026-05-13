@@ -7,6 +7,10 @@ import 'package:flutter/material.dart';
 
 class IncidenteViewModel extends ChangeNotifier {
   final AgentePolicia currentUser;
+  bool _isLoading = false;
+
+  bool get isLoading => _isLoading;
+  set isLoading(bool val) { _isLoading = val; notifyListeners(); }
 
   IncidenteViewModel({required this.currentUser});
 
@@ -50,6 +54,14 @@ class IncidenteViewModel extends ChangeNotifier {
   List<IncidenteReportado> get nuevosIncidentes => incidentosReportados;
 
   // --- ACCIONES DE NEGOCIO ---
+
+  // Simulación de carga inicial desde backend
+  Future<void> fetchIncidentes() async {
+    isLoading = true;
+    // Futuro: _allIncidents = await _incidentService.getAll();
+    await Future.delayed(const Duration(seconds: 1));
+    isLoading = false;
+  }
 
   // 1. Denunciante crea reporte
   void crearReporte(TipoIncidente tipo) {

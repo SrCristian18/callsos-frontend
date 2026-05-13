@@ -19,4 +19,24 @@ class AgentePolicia {
   String get name => nombre;
 
   String get caiName => cai ?? "Sin asignar";
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'nombre': nombre,
+      'rol': rol.name,
+      'estadoAgente': estadoAgente.name,
+      'cai': cai,
+    };
+  }
+
+  factory AgentePolicia.fromMap(Map<String, dynamic> map) {
+    return AgentePolicia(
+      id: map['id'] ?? '',
+      nombre: map['nombre'] ?? '',
+      rol: Rol.values.byName(map['rol']),
+      estadoAgente: EstadoAgente.values.byName(map['estadoAgente']),
+      cai: map['cai'],
+    );
+  }
 }
