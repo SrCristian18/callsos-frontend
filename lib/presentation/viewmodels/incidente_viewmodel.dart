@@ -4,6 +4,17 @@ import 'package:CallSos/data/models/incidente_reportado.dart';
 import 'package:CallSos/data/models/tipo_incidente.dart';
 import 'package:flutter/material.dart';
 
+/// ViewModel de gestión de incidentes para roles policiales
+/// (Comando, Operador CAI, Agente).
+///
+/// F.0.2 — MIGRACIÓN MÍNIMA DE COMPATIBILIDAD:
+/// Los valores de [EstadoIncidente] usados aquí se actualizaron para
+/// coincidir con el enum alineado al backend
+/// (RECIBIDO -> CREADO, CAI_ASIGNADO -> DERIVADO_A_CAI,
+/// COMPLETADO -> FINALIZADO). La lógica y los datos siguen siendo en
+/// memoria/mock; la reescritura completa para consumir
+/// `IIncidenteService` (F.0.3) sobre el modelo [Incidente] (F.0.2) ocurre
+/// en F.2 (Home views por rol + Detalle de Incidente).
 
 class IncidenteViewModel extends ChangeNotifier {
   final AgentePolicia currentUser;
@@ -27,7 +38,7 @@ class IncidenteViewModel extends ChangeNotifier {
       fechaCreacion: DateTime.now(),
       ubicacion: "Parque Simón Bolívar",
       detalles: "Se reporta una riña entre dos personas en el sector norte.",
-      estado: EstadoIncidente.RECIBIDO,
+      estado: EstadoIncidente.CREADO,
     ),
   ];
 
@@ -37,15 +48,15 @@ class IncidenteViewModel extends ChangeNotifier {
   List<IncidenteReportado> get misReportes => _allIncidents.where((i) => i.id == currentUser.id).toList();
 
   // Para el Comando
-  List<IncidenteReportado> get incidentosReportados => _allIncidents.where((i) => i.estado == EstadoIncidente.RECIBIDO).toList();
-  List<IncidenteReportado> get incidentosDelegados => _allIncidents.where((i) => i.estado != EstadoIncidente.RECIBIDO).toList();
+  List<IncidenteReportado> get incidentosReportados => _allIncidents.where((i) => i.estado == EstadoIncidente.CREADO).toList();
+  List<IncidenteReportado> get incidentosDelegados => _allIncidents.where((i) => i.estado != EstadoIncidente.CREADO).toList();
 
   // Para el Jefe de CAI
   List<IncidenteReportado> get pendientesPorAsignar => _allIncidents.where((i) => 
-    i.caiId == currentUser.cai && i.estado == EstadoIncidente.CAI_ASIGNADO).toList();
+    i.caiId == currentUser.cai && i.estado == EstadoIncidente.DERIVADO_A_CAI).toList();
   
   List<IncidenteReportado> get historialCai => _allIncidents.where((i) => 
-    i.caiId == currentUser.cai && (i.estado == EstadoIncidente.AGENTE_ASIGNADO || i.estado == EstadoIncidente.COMPLETADO)).toList();
+    i.caiId == currentUser.cai && (i.estado == EstadoIncidente.AGENTE_ASIGNADO || i.estado == EstadoIncidente.FINALIZADO)).toList();
 
   // Para el Agente
   List<IncidenteReportado> get misAsignaciones => _allIncidents.where((i) => 
@@ -71,7 +82,7 @@ class IncidenteViewModel extends ChangeNotifier {
       fechaCreacion: DateTime.now(),
       ubicacion: " ", //proviene del usuario
       detalles: " ", //proviene del usuario
-      estado: EstadoIncidente.RECIBIDO,
+      estado: EstadoIncidente.CREADO,
     );
     _allIncidents.add(nuevo);
     notifyListeners();
@@ -82,7 +93,7 @@ class IncidenteViewModel extends ChangeNotifier {
     final index = _allIncidents.indexWhere((i) => i.id == incidentId);
     if (index != -1) {
       _allIncidents[index] = _allIncidents[index].copyWith(
-        estado: EstadoIncidente.CAI_ASIGNADO,
+        estado: EstadoIncidente.DERIVADO_A_CAI,
         caiId: caiId,
       );
       notifyListeners();
@@ -106,7 +117,7 @@ class IncidenteViewModel extends ChangeNotifier {
     final index = _allIncidents.indexWhere((i) => i.id == incidentId);
     if (index != -1) {
       _allIncidents[index] = _allIncidents[index].copyWith(
-        estado: EstadoIncidente.COMPLETADO,
+        estado: EstadoIncidente.FINALIZADO,
       );
       notifyListeners();
     }

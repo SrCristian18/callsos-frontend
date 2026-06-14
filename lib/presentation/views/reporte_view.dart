@@ -382,45 +382,45 @@ class _ReporteView extends State<ReporteView> {
     Color color;
     String texto;
 
+    // F.0.2: switch reescrito sobre el EstadoIncidente alineado al backend
+    // (CREADO, DERIVADO_A_CAI, AGENTE_ASIGNADO, AGENTE_EN_CAMINO,
+    // EN_ATENCION, FINALIZADO, CANCELADO). Los antiguos PENDIENTE/INCOMPLETO
+    // no existen en el backend y se eliminaron; este helper será
+    // reemplazado por el widget reutilizable `estado_chip.dart` en F.1.
     switch (estado) {
-      case EstadoIncidente.PENDIENTE:
-        color = Colors.orange;
-        texto = "Pendiente";
-        break;
-
-      case EstadoIncidente.EN_PROCESO:
-        color = Colors.blue;
-        texto = "En proceso";
-        break;
-
-      case EstadoIncidente.RECIBIDO:
+      case EstadoIncidente.CREADO:
         color = Colors.green;
-        texto = "Recibido";
+        texto = "Creado";
         break;
-      
-      case EstadoIncidente.CAI_ASIGNADO:
+
+      case EstadoIncidente.DERIVADO_A_CAI:
         color = Colors.purple;
-        texto = "Cai asignado";
+        texto = "Derivado a CAI";
         break;
 
       case EstadoIncidente.AGENTE_ASIGNADO:
         color = Colors.lightGreen;
         texto = "Agente asignado";
         break;
-      
-      case EstadoIncidente.COMPLETADO:
+
+      case EstadoIncidente.AGENTE_EN_CAMINO:
+        color = Colors.blue;
+        texto = "Agente en camino";
+        break;
+
+      case EstadoIncidente.EN_ATENCION:
+        color = Colors.indigo;
+        texto = "En atención";
+        break;
+
+      case EstadoIncidente.FINALIZADO:
         color = Colors.lightGreenAccent;
-        texto = "Completado";
+        texto = "Finalizado";
         break;
 
       case EstadoIncidente.CANCELADO:
         color = Colors.red;
         texto = "Cancelado";
-        break;
-
-      case EstadoIncidente.INCOMPLETO:
-        color = Colors.blueGrey;
-        texto = "Incompleto";
         break;
     }
 

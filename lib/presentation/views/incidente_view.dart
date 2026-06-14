@@ -30,10 +30,15 @@ class IncidenteView extends StatelessWidget {
     switch (vm.currentUser.rol) {
       case Rol.COMANDO:
         return ComandoView(vm: vm);
-      case Rol.JEFE_CAI:
+      // F.0.2: Rol.JEFE_CAI -> Rol.OPERADOR_CAI (alineación con backend).
+      case Rol.OPERADOR_CAI:
         return JefeCaiView(vm: vm);
-      case Rol.AGENTE_POLICIA:
+      // F.0.2: Rol.AGENTE_POLICIA -> Rol.AGENTE (alineación con backend).
+      case Rol.AGENTE:
         return AgenteView(vm: vm);
+      // Rol.DENUNCIANTE (nuevo en F.0.2) y cualquier otro caso: esta vista
+      // es exclusiva de roles policiales, el denunciante usa otro flujo
+      // (HomeDenuncianteView, F.2).
       default:
         return const Center(child: Text("Acceso no autorizado"));
     }
