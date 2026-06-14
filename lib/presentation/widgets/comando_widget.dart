@@ -1,3 +1,4 @@
+import 'package:CallSos/data/models/enums/estado_incidente.dart';
 import 'package:CallSos/data/models/incidente_reportado.dart';
 import 'package:CallSos/presentation/viewmodels/incidente_viewmodel.dart';
 import 'package:flutter/material.dart';
@@ -62,8 +63,15 @@ class ComandoView extends StatelessWidget {
             title: Text(item.incidente.titulo),
             subtitle: Text("Delegado a: ${item.caiId}"),
             trailing: Icon(
-              item.estado.name == 'COMPLETADO' ? Icons.check_circle : Icons.pending,
-              color: item.estado.name == 'COMPLETADO' ? Colors.green : Colors.orange,
+              // F.0.2: 'COMPLETADO' -> EstadoIncidente.FINALIZADO
+              // (comparación por enum en vez de string, para que el
+              // analizador detecte futuros desalineamientos).
+              item.estado == EstadoIncidente.FINALIZADO
+                  ? Icons.check_circle
+                  : Icons.pending,
+              color: item.estado == EstadoIncidente.FINALIZADO
+                  ? Colors.green
+                  : Colors.orange,
             ),
           ),
         );

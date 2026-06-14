@@ -14,11 +14,16 @@ class AppProviders {
         ChangeNotifierProvider(create: (_) => ReporteViewModel()),
         ChangeNotifierProvider(create: (_) => RegisterPoliciaViewModel()),
         ChangeNotifierProvider(
+          // TODO(F.0.4): este usuario hardcodeado debe ser reemplazado por
+          // un SesionViewModel que obtenga {actorId, rol} reales del JWT
+          // tras el login (ver capa de sesión, F.0.4).
           create: (_) => IncidenteViewModel(
             currentUser: AgentePolicia(
               id: 'comando-1',
               nombre: 'Oficial de Prueba',
-              rol: Rol.JEFE_CAI,
+              // F.0.2: Rol.JEFE_CAI -> Rol.OPERADOR_CAI (alineación con
+              // RolUsuario del backend / claim 'rol' del JWT).
+              rol: Rol.OPERADOR_CAI,
               cai: 'CAI San Francisco',
               estadoAgente: EstadoAgente.DISPONIBLE,
             ),

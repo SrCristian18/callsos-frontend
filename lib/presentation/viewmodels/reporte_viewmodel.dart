@@ -66,7 +66,7 @@ class ReporteViewModel extends ChangeNotifier {
         fechaCreacion: DateTime.now(),
         ubicacion: "",
         detalles: "",
-        estado: EstadoIncidente.RECIBIDO,
+        estado: EstadoIncidente.CREADO, // F.0.2: RECIBIDO -> CREADO
         ),
     );
 
