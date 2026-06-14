@@ -44,4 +44,30 @@ class IncidenteReportado {
       agenteId: agenteId ?? this.agenteId,
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'incidenteId': incidente.id,
+      'fechaCreacion': fechaCreacion.toIso8601String(),
+      'ubicacion': ubicacion,
+      'detalles': detalles,
+      'estado': estado.name,
+      'caiId': caiId,
+      'agenteId': agenteId,
+    };
+  }
+
+  factory IncidenteReportado.fromMap(Map<String, dynamic> map, TipoIncidente tipo) {
+    return IncidenteReportado(
+      id: map['id'],
+      incidente: tipo,
+      fechaCreacion: DateTime.parse(map['fechaCreacion']),
+      ubicacion: map['ubicacion'],
+      detalles: map['detalles'],
+      estado: EstadoIncidente.values.byName(map['estado']),
+      caiId: map['caiId'],
+      agenteId: map['agenteId'],
+    );
+  }
 }
