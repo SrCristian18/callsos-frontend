@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:CallSos/data/models/enums/tipoincidenteenum.dart';
-import 'package:CallSos/data/models/tipoincidentepresentacion.dart';
+import 'package:CallSos/data/models/enums/tipo_incidente_enum.dart';
+import 'package:CallSos/data/models/tipo_incidente_presentacion.dart';
 
 void main() {
   group('TipoIncidenteEnum — mapeo JSON', () {

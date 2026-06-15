@@ -1,5 +1,5 @@
 import 'enums/estado_incidente.dart';
-import 'enums/tipoincidenteenum.dart';
+import 'enums/tipo_incidente_enum.dart';
 import 'valueobject/ubicacion.dart';
 
 /// Modelo de un incidente, espejo 1:1 de `IncidenteResponse`

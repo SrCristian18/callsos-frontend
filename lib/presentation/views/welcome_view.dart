@@ -51,8 +51,11 @@ class WelcomeView extends StatelessWidget {
                       ),
                       onPressed: () {
                         Provider.of<LoginViewModel>(context, listen: false).resetForm();
-                        if(role == 'policia') Navigator.pushNamed(context, '/login_policia');
-                        else Navigator.pushNamed(context, '/login_denunciante');
+                        if(role == 'policia') {
+                          Navigator.pushNamed(context, '/login_policia');
+                        } else {
+                          Navigator.pushNamed(context, '/login_denunciante');
+                        }
                       },
                       child: const Text("Iniciar sesion", style: TextStyle(color: Colors.white)),
                     ),
@@ -68,8 +71,11 @@ class WelcomeView extends StatelessWidget {
                       ),
                       onPressed: () {
                         Provider.of<LoginViewModel>(context, listen: false).resetForm();
-                        if(role == 'policia') Navigator.pushNamed(context, '/register_policia');
-                        else Navigator.pushNamed(context, '/register_denunciante');
+                        if(role == 'policia') {
+                          Navigator.pushNamed(context, '/register_policia');
+                        } else {
+                          Navigator.pushNamed(context, '/register_denunciante');
+                        }
                       },
                       child: const Text("Registrarse", style: TextStyle(color: Color(0xFF1B2A3B), fontWeight: FontWeight.bold)),
                     ),

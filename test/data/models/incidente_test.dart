@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:CallSos/data/models/incidente.dart';
 import 'package:CallSos/data/models/enums/estado_incidente.dart';
-import 'package:CallSos/data/models/enums/tipoincidenteenum.dart';
+import 'package:CallSos/data/models/enums/tipo_incidente_enum.dart';
 import 'package:CallSos/data/models/valueobject/ubicacion.dart';
 
 void main() {

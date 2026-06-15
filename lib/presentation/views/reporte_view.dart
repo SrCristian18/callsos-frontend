@@ -20,7 +20,7 @@ class _ReporteView extends State<ReporteView> {
       body: SafeArea(
         child: AnimatedBuilder(
           animation: vm,
-          builder: (_, __) {
+          builder: (_, _) {
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Column(
@@ -96,7 +96,7 @@ class _ReporteView extends State<ReporteView> {
 
           Icon(
             Icons.notifications_none_rounded,
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.8),
           ),
         ],
       ),
@@ -172,7 +172,7 @@ class _ReporteView extends State<ReporteView> {
   Widget _buildIncidentes() {
     return ListView.separated(
       itemCount: vm.incidentes.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (_, index) {
         final incidente = vm.incidentes[index];
 
@@ -267,7 +267,7 @@ class _ReporteView extends State<ReporteView> {
 
     return ListView.separated(
       itemCount: vm.reportados.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (_, index) {
         final reporte = vm.reportados[index];
 
@@ -430,7 +430,7 @@ class _ReporteView extends State<ReporteView> {
         vertical: 4,
       ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
