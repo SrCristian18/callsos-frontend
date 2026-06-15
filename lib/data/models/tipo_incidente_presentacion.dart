@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'enums/tipoincidenteenum.dart';
+import 'enums/tipo_incidente_enum.dart';
 
 /// Datos de presentación (UI) para un [TipoIncidenteEnum].
 ///

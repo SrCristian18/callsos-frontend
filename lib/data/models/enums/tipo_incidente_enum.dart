@@ -16,6 +16,7 @@
 ///
 /// Usar siempre [TipoIncidenteJson.toJson] / [tipoIncidenteFromJson] para
 /// convertir hacia/desde el backend.
+library;
 
 enum TipoIncidenteEnum {
   RUIDO_EXCESIVO,
