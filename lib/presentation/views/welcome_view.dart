@@ -1,8 +1,8 @@
+import 'package:CallSos/core/app_routes.dart';
 import 'package:CallSos/presentation/viewmodels/login_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/colores_app.dart';
-
 class WelcomeView extends StatelessWidget {
   const WelcomeView({super.key});
 
@@ -51,11 +51,8 @@ class WelcomeView extends StatelessWidget {
                       ),
                       onPressed: () {
                         Provider.of<LoginViewModel>(context, listen: false).resetForm();
-                        if(role == 'policia') {
-                          Navigator.pushNamed(context, '/login_policia');
-                        } else {
-                          Navigator.pushNamed(context, '/login_denunciante');
-                        }
+                        if(role == 'policia') Navigator.pushNamed(context, AppRoutes.loginPolicia);
+                        else Navigator.pushNamed(context, AppRoutes.loginDenunciante);
                       },
                       child: const Text("Iniciar sesion", style: TextStyle(color: Colors.white)),
                     ),
@@ -71,11 +68,8 @@ class WelcomeView extends StatelessWidget {
                       ),
                       onPressed: () {
                         Provider.of<LoginViewModel>(context, listen: false).resetForm();
-                        if(role == 'policia') {
-                          Navigator.pushNamed(context, '/register_policia');
-                        } else {
-                          Navigator.pushNamed(context, '/register_denunciante');
-                        }
+                        if(role == 'policia') Navigator.pushNamed(context, AppRoutes.registerPolicia);
+                        else Navigator.pushNamed(context, AppRoutes.registerDenunciante);
                       },
                       child: const Text("Registrarse", style: TextStyle(color: Color(0xFF1B2A3B), fontWeight: FontWeight.bold)),
                     ),
