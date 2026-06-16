@@ -17,13 +17,36 @@ import 'package:flutter/material.dart';
 /// en F.2 (Home views por rol + Detalle de Incidente).
 
 class IncidenteViewModel extends ChangeNotifier {
-  final AgentePolicia currentUser;
+  // F.0.4: ya no es `final` -- ver actualizarUsuario() más abajo.
+  AgentePolicia currentUser;
   bool _isLoading = false;
 
   bool get isLoading => _isLoading;
   set isLoading(bool val) { _isLoading = val; notifyListeners(); }
 
   IncidenteViewModel({required this.currentUser});
+
+  /// F.0.4 — Gestión de sesión.
+  ///
+  /// Actualiza [currentUser] cuando cambia la sesión (login/logout),
+  /// invocado por el `ChangeNotifierProxyProvider` en `AppProviders` cada
+  /// vez que [SesionViewModel] notifica cambios.
+  ///
+  /// Solo notifica a los listeners si la identidad (id/rol) realmente
+  /// cambió, para no provocar rebuilds innecesarios durante los toggles de
+  /// `isLoading` de [SesionViewModel] (login/restaurarSesion) que no
+  /// implican un cambio de usuario.
+  ///
+  /// IMPORTANTE: a diferencia de un `create` que construye un
+  /// `IncidenteViewModel` nuevo, este método MUTA la instancia existente,
+  /// preservando `_allIncidents` (el estado mock en memoria) — la
+  /// reescritura completa sobre `IIncidenteService`/`Incidente` (F.0.2/F.0.3)
+  /// ocurre en F.2.
+  void actualizarUsuario(AgentePolicia nuevo) {
+    if (nuevo.id == currentUser.id && nuevo.rol == currentUser.rol) return;
+    currentUser = nuevo;
+    notifyListeners();
+  }
 
   // Catálogo de tipos de incidentes (para el denunciante)
   final List<TipoIncidente> catalogTypes = [
