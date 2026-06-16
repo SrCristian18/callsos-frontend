@@ -6,6 +6,7 @@ import 'package:CallSos/data/models/enums/estado_agente.dart';
 import 'package:CallSos/data/models/enums/rol.dart';
 import 'package:CallSos/data/services/api_client.dart';
 import 'package:CallSos/data/services/auth_service.dart';
+import 'package:CallSos/data/services/geolocalizacion_service.dart';
 import 'package:CallSos/presentation/viewmodels/incidente_viewmodel.dart';
 import 'package:CallSos/presentation/viewmodels/login_viewmodel.dart';
 import 'package:CallSos/presentation/viewmodels/register_policia_viewmodel.dart';
@@ -69,6 +70,13 @@ class AppProviders {
       ChangeNotifierProvider(create: (_) => LoginViewModel()),
       ChangeNotifierProvider(create: (_) => ReporteViewModel()),
       ChangeNotifierProvider(create: (_) => RegisterPoliciaViewModel()),
+
+      // F.0.6 — Geolocalización: instancia única compartida entre
+      // HomeDenuncianteView (F.1, obtenerPosicionActual) y
+      // TrackingView (F.3, streamPosicion).
+      Provider<IGeolocalizacionService>(
+        create: (_) => GeolocalizacionService(),
+      ),
 
       // F.0.4 — Sesión real: login/logout/restauración + JWT.
       ChangeNotifierProvider<SesionViewModel>(

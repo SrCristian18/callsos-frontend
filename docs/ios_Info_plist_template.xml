@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+
+<!--
+  F.0.6 — Permisos GPS para iOS (PLANTILLA DE REFERENCIA)
+
+  IMPORTANTE: Este archivo es una PLANTILLA. El proyecto callsos-frontend
+  actualmente NO tiene soporte iOS (no existe la carpeta ios/). Cuando se
+  añada soporte iOS con `flutter create --platforms=ios .`, el archivo
+  generado en ios/Runner/Info.plist debe incluir las claves de esta
+  plantilla.
+
+  Instrucciones:
+  1. Ejecutar: flutter create --platforms=ios .
+  2. Abrir ios/Runner/Info.plist
+  3. Añadir las claves de este archivo dentro del <dict> principal.
+
+  CLAVES REQUERIDAS POR geolocator
+  ════════════════════════════════════════════════════════════════════════
+
+  NSLocationWhenInUseUsageDescription  (OBLIGATORIA)
+    → Se muestra cuando la app solicita ubicación en primer plano.
+    → Equivale a ACCESS_FINE_LOCATION en Android.
+    → Requerida para: botón de pánico (F.1), tracking activo (F.3).
+
+  NSLocationAlwaysAndWhenInUseUsageDescription  (PARA BACKGROUND — F.3)
+    → Requerida si el agente debe transmitir GPS con la app en segundo
+      plano. NO incluir hasta que el flujo de tracking (F.3) esté
+      implementado y se haya evaluado el impacto en la revisión de
+      App Store. Por ahora el tracking se hará solo en foreground.
+
+  CFBundleDisplayName
+    → Nombre visible de la app en la pantalla de inicio de iOS.
+-->
+<plist version="1.0">
+<dict>
+
+    <!-- Nombre de la app en el launcher de iOS -->
+    <key>CFBundleDisplayName</key>
+    <string>CallSOS</string>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         GPS en foreground (botón de pánico F.1 + tracking F.3)
+         ══════════════════════════════════════════════════════════════ -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>CallSOS necesita tu ubicación para enviar las coordenadas
+exactas de la emergencia a las autoridades y facilitar una respuesta
+más rápida.</string>
+
+    <!--
+    ══════════════════════════════════════════════════════════════════
+    GPS en background — SOLO ACTIVAR EN F.3 si se implementa tracking
+    de agente en segundo plano con ForegroundService.
+    Requiere justificación detallada en la revisión de App Store.
+    ══════════════════════════════════════════════════════════════════
+
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>CallSOS necesita tu ubicación en todo momento para que las
+autoridades puedan rastrear la posición del agente asignado a tu
+emergencia, incluso cuando la app está en segundo plano.</string>
+
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>location</string>
+    </array>
+    -->
+
+</dict>
+</plist>
