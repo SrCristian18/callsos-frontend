@@ -1,3 +1,4 @@
+import 'package:CallSos/core/app_routes.dart';
 import 'package:CallSos/presentation/viewmodels/login_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -28,7 +29,7 @@ class RoleSelectionView extends StatelessWidget {
                 icon: Icons.person_search,
                 onTap: () {
                   Provider.of<LoginViewModel>(context, listen: false).resetForm();
-                  Navigator.pushNamed(context, '/welcome', arguments: 'denunciante');
+                  Navigator.pushNamed(context, AppRoutes.welcome, arguments: 'denunciante');
                 },
               ),
               
@@ -40,7 +41,7 @@ class RoleSelectionView extends StatelessWidget {
                 icon: Icons.local_police,
                 onTap: () {
                   Provider.of<LoginViewModel>(context, listen: false).resetForm();  
-                  Navigator.pushNamed(context, '/welcome', arguments: 'policia');
+                  Navigator.pushNamed(context, AppRoutes.welcome, arguments: 'policia');
                 },
               ),
             ],
