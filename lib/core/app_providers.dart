@@ -6,6 +6,9 @@ import 'package:CallSos/data/models/enums/estado_agente.dart';
 import 'package:CallSos/data/models/enums/rol.dart';
 import 'package:CallSos/data/services/api_client.dart';
 import 'package:CallSos/data/services/auth_service.dart';
+import 'package:CallSos/data/services/geolocalizacion_service.dart';
+import 'package:CallSos/data/services/incidente_service.dart';
+import 'package:CallSos/presentation/viewmodels/crear_incidente_viewmodel.dart';
 import 'package:CallSos/presentation/viewmodels/incidente_viewmodel.dart';
 import 'package:CallSos/presentation/viewmodels/login_viewmodel.dart';
 import 'package:CallSos/presentation/viewmodels/register_policia_viewmodel.dart';
@@ -60,6 +63,7 @@ class AppProviders {
     // implementa ITokenProvider — ver F.0.3/F.0.4).
     final apiClient = ApiClient();
     final authService = AuthService(apiClient);
+    final incidenteService = IncidenteService(apiClient);
 
     return [
       // login_view.dart (denunciante) sigue usando este ViewModel mock por
@@ -69,6 +73,54 @@ class AppProviders {
       ChangeNotifierProvider(create: (_) => LoginViewModel()),
       ChangeNotifierProvider(create: (_) => ReporteViewModel()),
       ChangeNotifierProvider(create: (_) => RegisterPoliciaViewModel()),
+
+      // F.0.6 — Geolocalización: instancia única compartida entre
+      // HomeDenuncianteView (F.1, obtenerPosicionActual) y
+      // TrackingView (F.3, streamPosicion).
+      Provider<IGeolocalizacionService>(
+        create: (_) => GeolocalizacionService(),
+      ),
+
+      // F.1 — Servicio de incidentes (capa de red).
+      Provider<IIncidenteService>(
+        create: (_) => IncidenteService(apiClient),
+      ),
+
+      // F.1 — ViewModel del botón de pánico (crear incidente).
+      // ProxyProvider porque depende de IIncidenteService e
+      // IGeolocalizacionService, ambos registrados arriba.
+      ChangeNotifierProxyProvider2<IIncidenteService, IGeolocalizacionService,
+          CrearIncidenteViewModel>(
+        create: (context) => CrearIncidenteViewModel(
+          incidenteService: context.read<IIncidenteService>(),
+          geoService: context.read<IGeolocalizacionService>(),
+        ),
+        update: (_, incidenteService, geoService, previous) =>
+            previous ??
+            CrearIncidenteViewModel(
+              incidenteService: incidenteService,
+              geoService: geoService,
+            ),
+      ),
+
+      // F.1 — Botón de pánico: CrearIncidenteViewModel usa IncidenteService
+      // (capa de red F.0.3) y GeolocalizacionService (F.0.6).
+      // ProxyProvider2 lo reconstruye si cualquiera de los dos cambia
+      // (en la práctica son stateless, así que nunca cambian — pero este
+      // patrón asegura que las dependencias se inyecten correctamente).
+      ProxyProvider2<IGeolocalizacionService, SesionViewModel,
+          CrearIncidenteViewModel>(
+        create: (_) => CrearIncidenteViewModel(
+          incidenteService: incidenteService,
+          geoService: GeolocalizacionService(),
+        ),
+        update: (_, geo, __, previous) =>
+            previous ??
+            CrearIncidenteViewModel(
+              incidenteService: incidenteService,
+              geoService: geo,
+            ),
+      ),
 
       // F.0.4 — Sesión real: login/logout/restauración + JWT.
       ChangeNotifierProvider<SesionViewModel>(

@@ -1,6 +1,33 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         F.0.6 — Permisos de geolocalización
+         ══════════════════════════════════════════════════════════════════
+
+         ACCESS_FINE_LOCATION  : GPS fino (precisión <10 m) — requerido
+           por geolocator con LocationAccuracy.high y por el backend para
+           calcular el CAI más cercano con Haversine.
+         ACCESS_COARSE_LOCATION: ubicación aproximada (red/WiFi) — Android
+           12+ la requiere en conjunto con FINE para que el sistema pueda
+           ofrecer la opción "Ubicación aproximada" al usuario.
+         ACCESS_NETWORK_STATE  : consultado por Dio/geolocator para
+           detectar si hay red antes de intentar conexiones.
+         INTERNET              : requerido por Dio (API REST) y por
+           firebase_messaging (F.5).
+
+         NOTA Android 10+ (API 29+): ACCESS_BACKGROUND_LOCATION es
+         necesario para tracking en background (F.3 — agente transmite GPS
+         mientras la app está en segundo plano). NO se declara aquí porque
+         Google Play Store exige justificación adicional para ese permiso;
+         se añadirá en F.3 junto con un servicio en foreground
+         (ForegroundService) que es el mecanismo recomendado.          -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
-        android:label="frontend"
+        android:label="CallSOS"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -31,11 +58,6 @@
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
-    <!-- Required to query activities that can process text, see:
-         https://developer.android.com/training/package-visibility and
-         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
-
-         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
