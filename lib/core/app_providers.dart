@@ -8,6 +8,7 @@ import 'package:CallSos/data/services/api_client.dart';
 import 'package:CallSos/data/services/auth_service.dart';
 import 'package:CallSos/data/services/geolocalizacion_service.dart';
 import 'package:CallSos/data/services/incidente_service.dart';
+import 'package:CallSos/data/services/reporte_service.dart';
 import 'package:CallSos/data/services/stomp_sevice.dart';
 import 'package:CallSos/presentation/viewmodels/crear_incidente_viewmodel.dart';
 import 'package:CallSos/presentation/viewmodels/incidente_viewmodel.dart';
@@ -85,6 +86,11 @@ class AppProviders {
       // F.1 — Servicio de incidentes (capa de red).
       Provider<IIncidenteService>(
         create: (_) => IncidenteService(apiClient),
+      ),
+
+      // F.4 — Servicio de reportes (hallazgos y administrativo).
+      Provider<IReporteService>(
+        create: (_) => ReporteService(apiClient),
       ),
 
       // F.3 — Servicio STOMP para tracking en tiempo real.

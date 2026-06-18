@@ -313,17 +313,18 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
       ));
     }
 
-    // AGENTE + EN_ATENCION → evaluar + reporte
+    // AGENTE + EN_ATENCION → reporte de hallazgos (sin evaluar() previo)
     if (rol == Rol.AGENTE &&
         inc.estado == EstadoIncidente.EN_ATENCION) {
       botones.add(_boton(
         label: '✅ Finalizar y reportar hallazgos',
         color: Colors.green.shade700,
-        onPressed: () => _ejecutar(
-          () => service.evaluar(inc.id),
-          mensajeExito: 'Incidente finalizado.',
-          rutaPostExito: AppRoutes.reporteHallazgos,
-          args: {'incidenteId': inc.id},
+        onPressed: () => Navigator.pushNamed(
+          context,
+          AppRoutes.reporteHallazgos,
+          arguments: {'incidenteId': inc.id},
+          // F.4: NO llamar evaluar() aquí — POST /reportes/hallazgos
+          // ya finaliza el incidente internamente (CrearReporteHallazgosService).
         ),
       ));
     }
