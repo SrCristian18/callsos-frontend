@@ -78,12 +78,10 @@ class _HomeAgenteViewState extends State<HomeAgenteView> {
         );
 
       case EstadoIncidente.EN_ATENCION:
-        // Evaluar + redirigir al formulario de hallazgos.
-        final ok = await _vm.ejecutarTransicion(
-          incidenteId: incidente.id,
-          accion: () => service.evaluar(incidente.id),
-        );
-        if (ok && context.mounted) {
+        // F.4 — NO llamar evaluar() aquí: CrearReporteHallazgosService
+        // (POST /reportes/hallazgos) ya finaliza el incidente internamente.
+        // Llamar evaluar() antes causaría 422 (incidente ya FINALIZADO).
+        if (context.mounted) {
           Navigator.pushNamed(
             context,
             AppRoutes.reporteHallazgos,
