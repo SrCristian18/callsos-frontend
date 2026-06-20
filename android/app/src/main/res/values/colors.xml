@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F.6 — Color de acento para notificaciones push de FCM.
+
+  Referenciado en AndroidManifest.xml como:
+    android:resource="@color/notification_color"
+
+  El valor corresponde al verde oscuro de la paleta de CallSOS
+  (AppColors.verdeOscuro = 0xFF1E9A20 en Flutter).
+-->
+<resources>
+    <color name="notification_color">#1E9A20</color>
+</resources>

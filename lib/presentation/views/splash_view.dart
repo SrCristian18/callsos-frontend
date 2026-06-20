@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
 import '../../data/models/enums/rol.dart';
+import '../../data/services/notificacion_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 
 /// Pantalla de inicio — decide la ruta inicial según la sesión.
@@ -47,6 +48,15 @@ class SplashView extends StatelessWidget {
         if (!sesion.isLoading) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!context.mounted) return;
+
+            // F.5 — Si es DENUNCIANTE autenticado, registrar/actualizar
+            // token FCM (puede haber cambiado desde la última sesión).
+            if (sesion.isAuthenticated && sesion.rol == Rol.DENUNCIANTE) {
+              context.read<NotificacionService>().registrarTokenEnBackend(
+                    actorId: sesion.actorId!,
+                  );
+            }
+
             final destino = sesion.isAuthenticated
                 ? _rutaPorRol(sesion.rol!)
                 : AppRoutes.roleSelection;

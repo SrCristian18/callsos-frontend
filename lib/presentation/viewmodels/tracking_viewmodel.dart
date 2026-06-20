@@ -6,7 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../data/models/enums/rol.dart';
 import '../../data/models/valueobject/ubicacion.dart';
 import '../../data/services/geolocalizacion_service.dart';
-import 'package:CallSos/data/services/stomp_sevice.dart';
+import 'package:CallSos/data/services/stomp_service.dart';
 
 /// Estados de la conexión STOMP.
 enum TrackingConexionEstado {

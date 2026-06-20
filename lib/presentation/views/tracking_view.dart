@@ -9,7 +9,7 @@ import '../../data/models/incidente.dart';
 import '../../data/models/valueobject/ubicacion.dart';
 import '../../data/services/geolocalizacion_service.dart';
 import '../../data/services/incidente_service.dart';
-import 'package:CallSos/data/services/stomp_sevice.dart';
+import 'package:CallSos/data/services/stomp_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../viewmodels/tracking_viewmodel.dart';
 
