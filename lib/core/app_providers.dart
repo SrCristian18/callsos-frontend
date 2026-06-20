@@ -6,10 +6,12 @@ import 'package:CallSos/data/models/enums/estado_agente.dart';
 import 'package:CallSos/data/models/enums/rol.dart';
 import 'package:CallSos/data/services/api_client.dart';
 import 'package:CallSos/data/services/auth_service.dart';
+import 'package:CallSos/data/services/denunciante_service.dart';
 import 'package:CallSos/data/services/geolocalizacion_service.dart';
 import 'package:CallSos/data/services/incidente_service.dart';
+import 'package:CallSos/data/services/notificacion_service.dart';
 import 'package:CallSos/data/services/reporte_service.dart';
-import 'package:CallSos/data/services/stomp_sevice.dart';
+import 'package:CallSos/data/services/stomp_service.dart';
 import 'package:CallSos/presentation/viewmodels/crear_incidente_viewmodel.dart';
 import 'package:CallSos/presentation/viewmodels/incidente_viewmodel.dart';
 import 'package:CallSos/presentation/viewmodels/login_viewmodel.dart';
@@ -17,26 +19,10 @@ import 'package:CallSos/presentation/viewmodels/register_policia_viewmodel.dart'
 import 'package:CallSos/presentation/viewmodels/reporte_viewmodel.dart';
 import 'package:CallSos/presentation/viewmodels/sesion_viewmodel.dart';
 
-/// Construye un [AgentePolicia] (modelo usado por [IncidenteViewModel] y
-/// las vistas/widgets de rol policial) a partir del estado de
-/// [SesionViewModel].
+/// Construye un [AgentePolicia] desde la sesión activa.
 ///
-/// F.0.4 — Gestión de sesión.
-///
-/// - Si no hay sesión activa (antes de [SesionViewModel.restaurarSesion]
-///   terminar, o tras [SesionViewModel.logout]), devuelve un usuario
-///   "vacío" con rol [Rol.DENUNCIANTE] como placeholder — `IncidenteView`
-///   (exclusiva de roles policiales) no debería ser alcanzable en este
-///   estado; el control de acceso por ruta según sesión es F.0.5.
-/// - Si hay sesión activa, usa `actorId`/`rol` REALES del JWT
-///   ([SesionViewModel.actorId] / [SesionViewModel.rol]) y
-///   [SesionViewModel.nombrePlaceholder] para el nombre.
-///
-/// DEUDA DE BACKEND (F.0.7): `cai` y `estadoAgente` son placeholders fijos
-/// porque `AuthResponse` no expone el perfil completo del agente (CAI
-/// asignado, disponibilidad). No afectan autenticación/autorización (eso
-/// depende del JWT real vía [ApiClient]), solo datos de presentación que
-/// se corregirán cuando exista un endpoint de perfil.
+/// DEUDA DE BACKEND (F.0.7): `cai` y `estadoAgente` son placeholders
+/// porque `AuthResponse` no expone perfil completo del agente.
 AgentePolicia _agentePoliciaDesdeSesion(SesionViewModel sesion) {
   if (!sesion.isAuthenticated) {
     return AgentePolicia(
@@ -46,67 +32,80 @@ AgentePolicia _agentePoliciaDesdeSesion(SesionViewModel sesion) {
       estadoAgente: EstadoAgente.DISPONIBLE,
     );
   }
-
   return AgentePolicia(
     id: sesion.actorId!,
     nombre: sesion.nombrePlaceholder,
     rol: sesion.rol!,
-    cai: 'CAI San Francisco', // TODO(F.0.7): placeholder, ver doc de la función.
-    estadoAgente: EstadoAgente.DISPONIBLE, // TODO(F.0.7): placeholder.
+    cai: 'CAI San Francisco', // TODO(F.0.7): placeholder
+    estadoAgente: EstadoAgente.DISPONIBLE, // TODO(F.0.7): placeholder
   );
 }
 
 class AppProviders {
   static List<SingleChildWidget> get providers {
-    // F.0.4 — instancias compartidas de la capa de red.
-    //
-    // `apiClient.tokenProvider` se conecta MÁS ABAJO, dentro del `create`
-    // de SesionViewModel, una vez que `sesion` existe (SesionViewModel
-    // implementa ITokenProvider — ver F.0.3/F.0.4).
+    // Instancias compartidas de la capa de red.
     final apiClient = ApiClient();
     final authService = AuthService(apiClient);
-    final incidenteService = IncidenteService(apiClient);
 
     return [
-      // login_view.dart (denunciante) sigue usando este ViewModel mock por
-      // ahora -- el registro/login del denunciante depende de endpoints de
-      // backend que aún no existen (ver F.0.7). login_policia_view.dart ya
-      // NO usa este provider (ver F.0.4: ahora usa SesionViewModel).
+      // ── ViewModels legacy (mantener hasta retiro post-F.7) ─────────
       ChangeNotifierProvider(create: (_) => LoginViewModel()),
       ChangeNotifierProvider(create: (_) => ReporteViewModel()),
       ChangeNotifierProvider(create: (_) => RegisterPoliciaViewModel()),
 
-      // F.0.6 — Geolocalización: instancia única compartida entre
-      // HomeDenuncianteView (F.1, obtenerPosicionActual) y
-      // TrackingView (F.3, streamPosicion).
+      // ── F.0.6 — Geolocalización ─────────────────────────────────────
       Provider<IGeolocalizacionService>(
         create: (_) => GeolocalizacionService(),
       ),
 
-      // F.1 — Servicio de incidentes (capa de red).
+      // ── F.0.3 — Servicios de red ────────────────────────────────────
       Provider<IIncidenteService>(
         create: (_) => IncidenteService(apiClient),
       ),
-
-      // F.4 — Servicio de reportes (hallazgos y administrativo).
       Provider<IReporteService>(
         create: (_) => ReporteService(apiClient),
       ),
+      Provider<IDenuncianteService>(
+        create: (_) => DenuncianteService(apiClient),
+      ),
 
-      // F.3 — Servicio STOMP para tracking en tiempo real.
-      // ProxyProvider para recibir SesionViewModel (ITokenProvider) y
-      // pasar el JWT al handshake WebSocket.
+      // ── F.5 — Notificaciones push ───────────────────────────────────
+      ProxyProvider<IDenuncianteService, NotificacionService>(
+        create: (context) => NotificacionService(
+          denuncianteService: context.read<IDenuncianteService>(),
+        ),
+        update: (_, denuncianteService, previous) =>
+            previous ??
+            NotificacionService(denuncianteService: denuncianteService),
+      ),
+
+      // ── F.0.4 — Sesión (DEBE ir antes de cualquier ProxyProvider
+      //             que dependa de SesionViewModel) ────────────────────
+      ChangeNotifierProvider<SesionViewModel>(
+        create: (_) {
+          final sesion = SesionViewModel(authService: authService);
+          // Conecta el JWT con ApiClient para que todas las peticiones
+          // incluyan Authorization: Bearer <token>.
+          apiClient.tokenProvider = sesion;
+          // Dispara restaurarSesion() sin bloquear el build inicial.
+          sesion.restaurarSesion();
+          return sesion;
+        },
+      ),
+
+      // ── F.3 — STOMP (depende de SesionViewModel → va después) ───────
       ProxyProvider<SesionViewModel, IStompService>(
         create: (context) => StompService(
           tokenProvider: context.read<SesionViewModel>(),
         ),
-        update: (context, sesion, previous) =>
+        update: (_, sesion, previous) =>
             previous ?? StompService(tokenProvider: sesion),
       ),
 
-      // F.1 — ViewModel del botón de pánico (crear incidente).
-      // ProxyProvider porque depende de IIncidenteService e
-      // IGeolocalizacionService, ambos registrados arriba.
+      // ── F.1 — Botón de pánico (una sola instancia) ──────────────────
+      // ChangeNotifierProxyProvider2 porque depende de IIncidenteService
+      // e IGeolocalizacionService (ambos estáticos — nunca cambian, pero
+      // el patrón asegura que se inyecten correctamente).
       ChangeNotifierProxyProvider2<IIncidenteService, IGeolocalizacionService,
           CrearIncidenteViewModel>(
         create: (context) => CrearIncidenteViewModel(
@@ -121,50 +120,13 @@ class AppProviders {
             ),
       ),
 
-      // F.1 — Botón de pánico: CrearIncidenteViewModel usa IncidenteService
-      // (capa de red F.0.3) y GeolocalizacionService (F.0.6).
-      // ProxyProvider2 lo reconstruye si cualquiera de los dos cambia
-      // (en la práctica son stateless, así que nunca cambian — pero este
-      // patrón asegura que las dependencias se inyecten correctamente).
-      ProxyProvider2<IGeolocalizacionService, SesionViewModel,
-          CrearIncidenteViewModel>(
-        create: (_) => CrearIncidenteViewModel(
-          incidenteService: incidenteService,
-          geoService: GeolocalizacionService(),
-        ),
-        update: (_, geo, __, previous) =>
-            previous ??
-            CrearIncidenteViewModel(
-              incidenteService: incidenteService,
-              geoService: geo,
-            ),
-      ),
-
-      // F.0.4 — Sesión real: login/logout/restauración + JWT.
-      ChangeNotifierProvider<SesionViewModel>(
-        create: (_) {
-          final sesion = SesionViewModel(authService: authService);
-          // Conecta el JWT actual con ApiClient para que TODAS las
-          // peticiones futuras (F.2+) incluyan Authorization: Bearer <token>.
-          apiClient.tokenProvider = sesion;
-          // Dispara la restauración de sesión sin bloquear el build inicial.
-          // `sesion.isLoading` arranca en `true` y SesionViewModel notifica
-          // cuando termina (ver doc de `isLoading` en SesionViewModel).
-          sesion.restaurarSesion();
-          return sesion;
-        },
-      ),
-
-      // F.0.4: IncidenteViewModel ya NO recibe un AgentePolicia fijo.
-      // ChangeNotifierProxyProvider lo mantiene sincronizado con la sesión:
-      // cada vez que SesionViewModel notifica (login/logout/restauración),
-      // se llama actualizarUsuario() sobre la MISMA instancia (preserva el
-      // estado mock _allIncidents hasta la reescritura completa en F.2).
+      // ── F.0.4 — IncidenteViewModel sincronizado con la sesión ────────
       ChangeNotifierProxyProvider<SesionViewModel, IncidenteViewModel>(
         create: (context) => IncidenteViewModel(
-          currentUser: _agentePoliciaDesdeSesion(context.read<SesionViewModel>()),
+          currentUser:
+              _agentePoliciaDesdeSesion(context.read<SesionViewModel>()),
         ),
-        update: (context, sesion, previous) {
+        update: (_, sesion, previous) {
           final usuario = _agentePoliciaDesdeSesion(sesion);
           if (previous == null) {
             return IncidenteViewModel(currentUser: usuario);

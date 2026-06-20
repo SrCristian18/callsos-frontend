@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "797912979117",
+    "project_id": "callsos-seguridad-ciudadana",
+    "storage_bucket": "callsos-seguridad-ciudadana.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:797912979117:android:d193ed1f9f7cdba07bd824",
+        "android_client_info": {
+          "package_name": "com.callsos.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAnhttftoDWFGd5s8nGww_HeKZlxmEPUyU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:797912979117:android:f671c2798919e0fb7bd824",
+        "android_client_info": {
+          "package_name": "com.example.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAnhttftoDWFGd5s8nGww_HeKZlxmEPUyU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

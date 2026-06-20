@@ -1,35 +1,62 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- ══════════════════════════════════════════════════════════════════
-         F.0.6 — Permisos de geolocalización
+         F.0.6 — Permisos de geolocalización (GPS)
          ══════════════════════════════════════════════════════════════════
 
          ACCESS_FINE_LOCATION  : GPS fino (precisión <10 m) — requerido
            por geolocator con LocationAccuracy.high y por el backend para
            calcular el CAI más cercano con Haversine.
-         ACCESS_COARSE_LOCATION: ubicación aproximada (red/WiFi) — Android
-           12+ la requiere en conjunto con FINE para que el sistema pueda
-           ofrecer la opción "Ubicación aproximada" al usuario.
+         ACCESS_COARSE_LOCATION: ubicación aproximada (red/WiFi) —
+           Android 12+ lo requiere junto con FINE para ofrecer la opción
+           "Ubicación aproximada".
          ACCESS_NETWORK_STATE  : consultado por Dio/geolocator para
-           detectar si hay red antes de intentar conexiones.
-         INTERNET              : requerido por Dio (API REST) y por
-           firebase_messaging (F.5).
+           detectar conectividad antes de intentar peticiones HTTP.
+         INTERNET              : requerido por Dio (API REST), FCM y STOMP.
 
-         NOTA Android 10+ (API 29+): ACCESS_BACKGROUND_LOCATION es
-         necesario para tracking en background (F.3 — agente transmite GPS
-         mientras la app está en segundo plano). NO se declara aquí porque
-         Google Play Store exige justificación adicional para ese permiso;
-         se añadirá en F.3 junto con un servicio en foreground
-         (ForegroundService) que es el mecanismo recomendado.          -->
+         NOTA — ACCESS_BACKGROUND_LOCATION (background GPS para tracking
+         del agente en F.3): NO se declara aquí. Google Play Store exige
+         justificación explícita; se añadirá junto con el ForegroundService
+         en la iteración de backend/F.3 avanzada.             -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- ══════════════════════════════════════════════════════════════════
+         F.6 — Permiso de notificaciones push (Android 13+ / API 33+)
+         ══════════════════════════════════════════════════════════════════
+
+         POST_NOTIFICATIONS es el permiso en tiempo de ejecución
+         introducido en Android 13 (API 33). Sin él, las notificaciones
+         push de FCM se silencian en Android 13+ sin ningún error visible.
+
+         Comportamiento por versión de Android:
+         · Android < 13 (API < 33): este permiso se ignora; las
+           notificaciones funcionan sin solicitarlo.
+         · Android 13+ (API 33+): el sistema muestra un diálogo nativo
+           al usuario la primera vez que la app llama a
+           FirebaseMessaging.instance.requestPermission() (gestionado por
+           NotificacionService.inicializar() en F.5).
+
+         IMPORTANTE: declarar el permiso aquí es NECESARIO pero no
+         suficiente — el diálogo al usuario se activa vía
+         FirebaseMessaging.requestPermission() en NotificacionService,
+         no automáticamente al instalar la app.              -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         F.6 — VIBRATE: requerido por flutter_local_notifications para
+         la vibración del canal "callsos_alertas" (enableVibration: true).
+         Sin este permiso la vibración se silencia sin error.
+         ══════════════════════════════════════════════════════════════════ -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <application
         android:label="CallSOS"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -39,29 +66,71 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-            <!-- Specifies an Android theme to apply to this Activity as soon as
-                 the Android process has started. This theme is visible to the user
-                 while the Flutter UI initializes. After that, this theme continues
-                 to determine the Window background behind the Flutter UI. -->
+
             <meta-data
-              android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
+
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <!-- Don't delete the meta-data below.
-             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+
+        <!-- ══════════════════════════════════════════════════════════════
+             F.6 — Firebase Cloud Messaging: servicio en background
+             ══════════════════════════════════════════════════════════════
+
+             FlutterFirebaseMessagingService es el servicio de Firebase
+             que recibe mensajes FCM cuando la app está en background o
+             terminated. Sin esta declaración, los push NO llegan en
+             background en Android (la app tiene que estar en foreground
+             para verlos, lo cual elimina el propósito de FCM).
+
+             firebase_messaging lo registra automáticamente en la mayoría
+             de configuraciones, pero declararlo explícitamente garantiza
+             compatibilidad con Android 12+ (que requiere que todos los
+             servicios exported=false sean explícitos).          -->
+        <service
+            android:name="com.google.firebase.messaging.FirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- ══════════════════════════════════════════════════════════════
+             F.6 — Ícono y color de notificación por defecto
+             ══════════════════════════════════════════════════════════════
+
+             android.drawable.ic_notification: ícono que aparece en la
+             barra de estado para las notificaciones push de FCM.
+             Usar un ícono monocromático blanco (adaptive icon style).
+             Por ahora usa el ícono de la app — en producción se debe
+             crear @drawable/ic_notification específico.
+
+             android.color.notification_color: color de acento del ícono
+             (verde oscuro de CallSOS: #1E9A20).                 -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="callsos_alertas" />
+
+        <!-- F.0.5: requerido por Flutter tool -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+
     <queries>
         <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT"/>
-            <data android:mimeType="text/plain"/>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
         </intent>
     </queries>
 </manifest>

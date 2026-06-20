@@ -6,7 +6,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:CallSos/data/models/enums/rol.dart';
 import 'package:CallSos/data/models/valueobject/ubicacion.dart';
 import 'package:CallSos/data/services/geolocalizacion_service.dart';
-import 'package:CallSos/data/services/stomp_sevice.dart';
+import 'package:CallSos/data/services/stomp_service.dart';
 import 'package:CallSos/presentation/viewmodels/tracking_viewmodel.dart';
 
 class MockStompService extends Mock implements IStompService {}
