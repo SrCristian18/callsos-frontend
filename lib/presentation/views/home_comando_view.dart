@@ -3,26 +3,51 @@ import 'package:provider/provider.dart';
 
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
-import '../../data/models/enums/estado_incidente.dart';
 import '../../data/models/incidente.dart';
+import '../../data/services/api_exception.dart';
 import '../../data/services/incidente_service.dart';
-import '../viewmodels/incidente_list_viewmodel.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/incidente_card.dart';
-import '../widgets/incidente_list_body.dart';
 
 /// Home de Comando.
 ///
 /// F.2 — Home views por rol + Detalle de Incidente.
 ///
-/// Tabs: "Reportados" (CREADO, pendientes de derivar) / "Delegados" (resto).
-/// Acción "Derivar a CAI": bottom sheet con opción automática
-/// (ver F.0.7 gap 2) → PATCH /{id}/derivar.
+/// ══════════════════════════════════════════════════════════════════════
+/// LIMITACIÓN ESTRUCTURAL DEL BACKEND (descubierta en validación end-to-end,
+/// no contemplada con suficiente alcance en el diagnóstico original / F.0.7)
+/// ══════════════════════════════════════════════════════════════════════
 ///
-/// NOTA: el backend no tiene un endpoint exclusivo para Comando que devuelva
-/// "todos los incidentes" — se usa misIncidentes() como workaround
-/// transitorio (F.0.7). En una versión futura debería existir un
-/// GET /incidentes/todos (COMANDO) o similar.
+/// El backend NO expone ningún endpoint que permita a COMANDO listar
+/// incidentes pendientes de derivar. Se investigaron las alternativas:
+///
+/// - `GET /mis-incidentes`: filtra por `denuncianteId == actorId del JWT`.
+///   El comandante no es un denunciante — siempre devuelve vacío.
+/// - `GET /asignados`: filtra por `agenteId == actorId del JWT`.
+///   El comandante no es un agente — siempre devuelve vacío.
+/// - `GET /por-cai`: filtra por `unidadPolicialId == actorId del JWT`.
+///   El comandante no es una unidad policial (CAI) — siempre devuelve
+///   vacío, Y ADEMÁS un incidente recién creado (`CREADO`) NUNCA tiene
+///   `unidadPolicialId` asignado todavía (ese es justamente el dato que
+///   Comando debe asignar al derivar) — el endpoint es estructuralmente
+///   incompatible con este caso de uso incluso si el actorId coincidiera.
+///
+/// Conclusión: no existe ningún workaround de solo-lectura que liste
+/// "todos los incidentes CREADO" con los endpoints actuales. Como el
+/// backend no se modifica en esta etapa, la solución es:
+///
+/// 1. Comunicar la limitación explícitamente en la UI (no simular datos
+///    ni aparentar una lista vacía como si fuera "no hay incidentes").
+/// 2. Ofrecer una vía funcional alternativa: localizar el incidente por
+///    ID exacto (`GET /{id}`, sin restricción de rol) y operar sobre él
+///    (derivar) desde ahí. El ID se comparte hoy por un canal externo
+///    (ej. el Operador CAI o el propio Comando lo consulta directamente
+///    en base de datos / logs) — no ideal, pero es lo único posible sin
+///    tocar el backend.
+///
+/// FIX DE BACKEND PROPUESTO (documentado también en docs/deuda_backend.md):
+/// `GET /incidentes?estado=CREADO` sin restricción de actor, accesible
+/// solo a rol COMANDO — analógico a `/por-cai` pero sin filtrar por unidad.
 class HomeComandoView extends StatefulWidget {
   const HomeComandoView({super.key});
 
@@ -30,56 +55,72 @@ class HomeComandoView extends StatefulWidget {
   State<HomeComandoView> createState() => _HomeComandoViewState();
 }
 
-class _HomeComandoViewState extends State<HomeComandoView>
-    with SingleTickerProviderStateMixin {
-  late IncidenteListViewModel _vm;
-  late TabController _tabs;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabs = TabController(length: 2, vsync: this);
-    final service = context.read<IIncidenteService>();
-    // WORKAROUND (F.0.7 gap 2): no hay endpoint "todos para Comando".
-    // Se usa porCai() o misIncidentes() según permisos del JWT.
-    // El backend resolverá esto con un endpoint dedicado.
-    _vm = IncidenteListViewModel(
-      service: service,
-      fetchFn: service.porCai,
-    );
-    _vm.cargar();
-  }
+class _HomeComandoViewState extends State<HomeComandoView> {
+  final _idController = TextEditingController();
+  Incidente? _incidenteEncontrado;
+  bool _buscando = false;
+  String? _error;
 
   @override
   void dispose() {
-    _tabs.dispose();
-    _vm.dispose();
+    _idController.dispose();
     super.dispose();
   }
 
-  Future<void> _mostrarDerivacion(
-      BuildContext context, Incidente incidente) async {
+  Future<void> _buscarPorId() async {
+    final id = _idController.text.trim();
+    if (id.isEmpty) return;
+
+    setState(() {
+      _buscando = true;
+      _error = null;
+      _incidenteEncontrado = null;
+    });
+
+    try {
+      final incidente =
+          await context.read<IIncidenteService>().consultar(id);
+      if (mounted) setState(() => _incidenteEncontrado = incidente);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'No se pudo buscar el incidente.');
+    } finally {
+      if (mounted) setState(() => _buscando = false);
+    }
+  }
+
+  Future<void> _derivar() async {
+    if (_incidenteEncontrado == null) return;
+
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) =>
-          _BottomSheetDerivar(incidente: incidente),
+      builder: (_) => _BottomSheetDerivar(incidente: _incidenteEncontrado!),
     );
 
-    if (confirmed == true && context.mounted) {
-      final ok = await _vm.ejecutarTransicion(
-        incidenteId: incidente.id,
-        accion: () =>
-            context.read<IIncidenteService>().derivar(incidente.id),
-      );
-      if (ok && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Incidente derivado al CAI más cercano.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+    if (confirmed == true && mounted) {
+      try {
+        await context
+            .read<IIncidenteService>()
+            .derivar(_incidenteEncontrado!.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Incidente derivado al CAI más cercano.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          // Refrescar para reflejar el nuevo estado.
+          _buscarPorId();
+        }
+      } on ApiException catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+          );
+        }
       }
     }
   }
@@ -88,94 +129,156 @@ class _HomeComandoViewState extends State<HomeComandoView>
   Widget build(BuildContext context) {
     final sesion = context.watch<SesionViewModel>();
 
-    return ChangeNotifierProvider.value(
-      value: _vm,
-      child: Scaffold(
-        backgroundColor: AppColors.blancoVerde,
-        appBar: AppBar(
-          backgroundColor: AppColors.negroTexto,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Centro de Comando',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold)),
-              Text(sesion.nombrePlaceholder,
-                  style: const TextStyle(
-                      color: Colors.white70, fontSize: 12)),
-            ],
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout, color: Colors.white),
-              onPressed: () async {
-                await sesion.logout();
-                if (mounted) {
-                  Navigator.pushReplacementNamed(
-                      context, AppRoutes.roleSelection);
-                }
-              },
-            ),
+    return Scaffold(
+      backgroundColor: AppColors.blancoVerde,
+      appBar: AppBar(
+        backgroundColor: AppColors.negroTexto,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Centro de Comando',
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            Text(sesion.nombrePlaceholder,
+                style: const TextStyle(color: Colors.white70, fontSize: 12)),
           ],
-          bottom: TabBar(
-            controller: _tabs,
-            indicatorColor: Colors.white,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white60,
-            tabs: const [
-              Tab(text: 'Reportados'),
-              Tab(text: 'Delegados'),
-            ],
-          ),
         ),
-        body: Consumer<IncidenteListViewModel>(
-          builder: (ctx, vm, __) => TabBarView(
-            controller: _tabs,
-            children: [
-              // Tab 1 — Reportados (CREADO)
-              IncidenteListBody(
-                vm: vm,
-                incidentes: vm.incidentesPorEstado(
-                    [EstadoIncidente.CREADO]),
-                mensajeVacio: 'No hay emergencias pendientes de derivar.',
-                iconoVacio: Icons.inbox_outlined,
-                buildCard: (i) => IncidenteCard(
-                  incidente: i,
-                  onTap: () => Navigator.pushNamed(ctx,
-                      AppRoutes.detalleIncidente,
-                      arguments: {'incidenteId': i.id}),
-                  labelAccion: vm.enProceso(i.id)
-                      ? 'Derivando...'
-                      : 'Derivar a CAI',
-                  onAccion: vm.enProceso(i.id)
-                      ? null
-                      : () => _mostrarDerivacion(ctx, i),
-                ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            onPressed: () async {
+              await sesion.logout();
+              if (mounted) {
+                Navigator.pushReplacementNamed(
+                    context, AppRoutes.roleSelection);
+              }
+            },
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Aviso de limitación del backend ──────────────────────
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.amber.shade300),
               ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: Colors.amber.shade800),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'El backend actual no permite listar automáticamente '
+                      'los incidentes pendientes de derivar. Busca el '
+                      'incidente por su ID para gestionarlo.',
+                      style: TextStyle(
+                          color: Colors.amber.shade900, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-              // Tab 2 — Delegados (ya derivados)
-              IncidenteListBody(
-                vm: vm,
-                incidentes: vm.incidentesPorEstado([
-                  EstadoIncidente.DERIVADO_A_CAI,
-                  EstadoIncidente.AGENTE_ASIGNADO,
-                  EstadoIncidente.AGENTE_EN_CAMINO,
-                  EstadoIncidente.EN_ATENCION,
-                  EstadoIncidente.FINALIZADO,
-                  EstadoIncidente.CANCELADO,
-                ]),
-                mensajeVacio: 'No hay incidentes delegados.',
-                iconoVacio: Icons.history_outlined,
-                buildCard: (i) => IncidenteCard(
-                  incidente: i,
-                  onTap: () => Navigator.pushNamed(ctx,
-                      AppRoutes.detalleIncidente,
-                      arguments: {'incidenteId': i.id}),
+            const SizedBox(height: 20),
+
+            // ── Buscador por ID ────────────────────────────────────────
+            const Text('Buscar incidente por ID',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _idController,
+                    decoration: InputDecoration(
+                      hintText: 'Ej: 5b1bc8de-6509-4ebe-bc9f-3dc407ca46d5',
+                      hintStyle: const TextStyle(fontSize: 12),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                    ),
+                    onSubmitted: (_) => _buscarPorId(),
+                  ),
                 ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.negroTexto,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.all(16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: _buscando ? null : _buscarPorId,
+                  child: _buscando
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
+                      : const Icon(Icons.search),
+                ),
+              ],
+            ),
+
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(children: [
+                  Icon(Icons.error_outline,
+                      color: Colors.red.shade600, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(_error!,
+                        style: TextStyle(
+                            color: Colors.red.shade700, fontSize: 13)),
+                  ),
+                ]),
               ),
             ],
-          ),
+
+            if (_incidenteEncontrado != null) ...[
+              const SizedBox(height: 20),
+              const Text('Incidente encontrado',
+                  style:
+                      TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              const SizedBox(height: 10),
+              IncidenteCard(
+                incidente: _incidenteEncontrado!,
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  AppRoutes.detalleIncidente,
+                  arguments: {'incidenteId': _incidenteEncontrado!.id},
+                ),
+                labelAccion: _incidenteEncontrado!.estado.name == 'CREADO'
+                    ? 'Derivar a CAI'
+                    : null,
+                onAccion:
+                    _incidenteEncontrado!.estado.name == 'CREADO'
+                        ? _derivar
+                        : null,
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -199,8 +302,7 @@ class _BottomSheetDerivar extends StatelessWidget {
             const Icon(Icons.domain_add_outlined, size: 24),
             const SizedBox(width: 10),
             const Text('Derivar a CAI',
-                style:
-                    TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const Spacer(),
             IconButton(
                 icon: const Icon(Icons.close),
@@ -213,7 +315,6 @@ class _BottomSheetDerivar extends StatelessWidget {
             style: TextStyle(color: Colors.grey, fontSize: 13),
           ),
           const SizedBox(height: 16),
-          // Opción única (F.0.7 gap 2 — deuda de backend)
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -250,8 +351,8 @@ class _BottomSheetDerivar extends StatelessWidget {
                 backgroundColor: AppColors.negroTexto,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+                shape:
+                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
               onPressed: () => Navigator.pop(context, true),
               child: const Text('Confirmar derivación',

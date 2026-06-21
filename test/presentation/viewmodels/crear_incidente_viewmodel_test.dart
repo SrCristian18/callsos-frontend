@@ -56,10 +56,23 @@ void main() {
       expect(vm.incidenteCreado, isNull);
     });
 
-    test('formularioValido solo cuando hay tipo seleccionado', () {
+    test(
+        'formularioValido requiere tipo seleccionado Y descripción no vacía '
+        '(el backend exige descripcion @NotBlank)', () {
       expect(vm.formularioValido, isFalse);
+
       vm.seleccionarTipo(TipoIncidenteEnum.ROBOS_O_ASALTOS);
+      expect(vm.formularioValido, isFalse, // aún falta descripción
+          reason: 'tipo solo no debe bastar; el backend exige descripción');
+
+      vm.descripcion = 'Robo a mano armada en el parque';
       expect(vm.formularioValido, isTrue);
+    });
+
+    test('descripción de solo espacios no cuenta como válida', () {
+      vm.seleccionarTipo(TipoIncidenteEnum.ROBOS_O_ASALTOS);
+      vm.descripcion = '   ';
+      expect(vm.formularioValido, isFalse);
     });
   });
 
@@ -121,6 +134,7 @@ void main() {
           .thenAnswer((_) async => PermisoGpsResultado.denegado);
 
       vm.seleccionarTipo(TipoIncidenteEnum.ROBOS_O_ASALTOS);
+      vm.descripcion = 'Robo en curso';
       final resultado = await vm.crearIncidente(denuncianteId: 'den-001');
 
       expect(resultado, isFalse);
@@ -139,6 +153,7 @@ void main() {
           .thenAnswer((_) async => PermisoGpsResultado.servicioDesactivado);
 
       vm.seleccionarTipo(TipoIncidenteEnum.RUIDO_EXCESIVO);
+      vm.descripcion = 'Música muy alta en el vecindario';
       final resultado = await vm.crearIncidente(denuncianteId: 'den-001');
 
       expect(resultado, isFalse);
@@ -155,6 +170,7 @@ void main() {
       );
 
       vm.seleccionarTipo(TipoIncidenteEnum.ROBOS_O_ASALTOS);
+      vm.descripcion = 'Robo en curso';
       final resultado = await vm.crearIncidente(denuncianteId: 'den-001');
 
       expect(resultado, isFalse);
@@ -184,6 +200,7 @@ void main() {
           ));
 
       vm.seleccionarTipo(TipoIncidenteEnum.ROBOS_O_ASALTOS);
+      vm.descripcion = 'Robo en curso';
       final resultado = await vm.crearIncidente(denuncianteId: 'den-001');
 
       expect(resultado, isFalse);
@@ -209,6 +226,7 @@ void main() {
           ));
 
       vm.seleccionarTipo(TipoIncidenteEnum.VIOLENCIA_DOMESTICA);
+      vm.descripcion = 'Situación de violencia doméstica';
       final resultado = await vm.crearIncidente(denuncianteId: 'den-001');
 
       expect(resultado, isFalse);

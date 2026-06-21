@@ -281,7 +281,7 @@ class _BottomSheetCrearIncidenteState
                       },
                     ),
                     const SizedBox(height: 20),
-                    const Text('Descripción (opcional)',
+                    const Text('Descripción *',
                         style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
                     TextField(

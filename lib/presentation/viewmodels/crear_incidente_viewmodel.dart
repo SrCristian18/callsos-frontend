@@ -42,7 +42,15 @@ class CrearIncidenteViewModel extends ChangeNotifier {
 
   TipoIncidenteEnum? get tipoSeleccionado => _tipoSeleccionado;
   String get descripcion => _descripcion;
-  bool get formularioValido => _tipoSeleccionado != null;
+
+  /// CORRECCIÓN (validación end-to-end real): el backend exige
+  /// `descripcion` como `@NotBlank` en `CrearIncidenteRequest`
+  /// (ver `CrearIncidenteRequest.java`) — NO es opcional, a diferencia
+  /// de lo asumido originalmente en el diseño de F.1. Se alinea aquí
+  /// para rechazar el envío ANTES de la llamada de red (evita que el
+  /// usuario espere el GPS solo para recibir un 400 del backend después).
+  bool get formularioValido =>
+      _tipoSeleccionado != null && _descripcion.trim().isNotEmpty;
 
   void seleccionarTipo(TipoIncidenteEnum tipo) {
     _tipoSeleccionado = tipo;
