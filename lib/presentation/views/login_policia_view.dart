@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
+import '../../data/models/enums/rol.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/custom_input.dart';
 
@@ -15,8 +17,9 @@ import '../widgets/custom_input.dart';
 /// - Llama a [SesionViewModel.login] -> `POST /auth/login` (F.0.3).
 /// - Muestra [SesionViewModel.errorMessage] si falla (credenciales
 ///   inválidas, timeout, sin conexión — ver `ApiException`).
-/// - En éxito, el JWT queda persistido (F.0.4) y se navega a
-///   `/incident_view` (que despacha por rol — Comando/Operador CAI/Agente).
+/// - En éxito, el JWT queda persistido (F.0.4) y se navega a la Home real
+///   correspondiente al rol (F.2): HomeAgenteView, HomeCAIView o
+///   HomeComandoView (ver [_rutaPorRol]).
 ///
 /// La reescritura visual completa (rediseño, textos, validaciones de
 /// formulario) es alcance de F.1/F.2; este cambio se limita a conectar la
@@ -31,6 +34,23 @@ class LoginPoliciaView extends StatefulWidget {
 class _LoginPoliciaViewState extends State<LoginPoliciaView> {
   final _userController = TextEditingController();
   final _passwordController = TextEditingController();
+
+  /// Home correspondiente al rol autenticado.
+  /// Mismo patrón que `SplashView._rutaPorRol` (F.0.5) — los roles
+  /// policiales (AGENTE / OPERADOR_CAI / COMANDO) van cada uno a su
+  /// Home real (F.2), no a la ruta legacy '/incident_view'.
+  String _rutaPorRol(Rol rol) {
+    switch (rol) {
+      case Rol.DENUNCIANTE:
+        return AppRoutes.homeDenunciante;
+      case Rol.AGENTE:
+        return AppRoutes.homeAgente;
+      case Rol.OPERADOR_CAI:
+        return AppRoutes.homeCai;
+      case Rol.COMANDO:
+        return AppRoutes.homeComando;
+    }
+  }
 
   @override
   void dispose() {
@@ -50,9 +70,11 @@ class _LoginPoliciaViewState extends State<LoginPoliciaView> {
     );
 
     if (exito && mounted) {
-      // IncidenteView despacha internamente por Rol (Comando / OPERADOR_CAI
-      // / AGENTE) — ver F.0.2.
-      Navigator.pushReplacementNamed(context, '/incident_view');
+      // FIX (validación end-to-end): este login llevaba a la ruta legacy
+      // '/incident_view' (comando_widget/jefecai_widget/agente_widget —
+      // datos mock en memoria, sin conexión real al backend). Las Home
+      // views reales (F.2) ya existen y deben usarse en su lugar.
+      Navigator.pushReplacementNamed(context, _rutaPorRol(sesion.rol!));
     }
     // Si falla, sesion.errorMessage ya quedó seteado y el Consumer de abajo
     // lo muestra automáticamente.

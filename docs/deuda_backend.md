@@ -45,7 +45,7 @@ Body: { tokenInvitacion, nombre, placa, password }
 
 ---
 
-## Gap 2 — Catálogo de CAIs / selección manual al derivar
+## Gap 2 — Catálogo de CAIs / selección manual al derivar / **listado para Comando**
 
 ### Estado actual del backend
 `AsignarCAIAIncidenteService` (`PATCH /api/v1/incidentes/{id}/derivar`)
@@ -54,26 +54,62 @@ Haversine sobre los **26 CAIs reales de Cartagena** cargados en `data.sql`.
 No existe endpoint para listar CAIs ni para que el operador elija
 manualmente.
 
-### Decisión de producto acordada (F.0.7)
-Según lo confirmado durante el diseño de fases: el operador de Comando debe
-poder **ver opciones candidatas y elegir**. Sin embargo, dado que el backend
-asigna automáticamente, el frontend implementará en **F.2** el siguiente
-patrón transitorio:
+### 🔴 ACTUALIZACIÓN — hallazgo de la validación end-to-end real
+Durante la validación end-to-end (post F.0–F.7) se confirmó un problema
+más grave de lo documentado originalmente: **no existe NINGÚN endpoint
+que permita a COMANDO listar los incidentes pendientes de derivar.**
+
+Los 3 endpoints de consulta existentes filtran por `actorId` del JWT
+contra un campo específico del incidente, y ninguno aplica al rol COMANDO:
+
+| Endpoint | Filtra por | Por qué no sirve para COMANDO |
+|---|---|---|
+| `GET /mis-incidentes` | `denuncianteId == actorId` | El comandante no es denunciante |
+| `GET /asignados` | `agenteId == actorId` | El comandante no es agente |
+| `GET /por-cai` | `unidadPolicialId == actorId` | El comandante no es una unidad policial. Además, un incidente recién `CREADO` **nunca** tiene `unidadPolicialId` (es justo el dato que Comando debe asignar) — el endpoint es incompatible incluso si el actorId coincidiera |
+
+**Confirmado contra el backend real**: un incidente en estado `CREADO`
+tiene `unidadPolicialId: null` y `nombreCAI: null` — no hay ningún campo
+en el modelo de incidente que lo asocie al comandante.
+
+### Decisión de producto acordada (F.0.7, vigente para selección de CAI)
+El operador de Comando debe poder **ver opciones candidatas y elegir**.
+Dado que el backend asigna automáticamente, el bottom sheet de
+confirmación de derivación mantiene el patrón:
 
 > Mostrar el CAI que el backend asignaría (el más cercano) como
 > **"opción sugerida única"** con un botón "Confirmar derivación". Al
-> confirmar, se dispara `PATCH /{id}/derivar` sin body adicional. Cuando
-> el backend exponga un endpoint de candidatos, la UI ya tendrá el patrón
-> de selección listo — solo cambia la fuente de datos.
+> confirmar, se dispara `PATCH /{id}/derivar` sin body adicional.
+
+### Workaround aplicado en HomeComandoView (post validación end-to-end)
+Como no hay forma de listar, `HomeComandoView` se rediseñó con:
+1. Un aviso visible explicando la limitación (no se simula ni se oculta).
+2. Un **buscador por ID de incidente** (`GET /{id}`, sin restricción de
+   rol) — el comandante pega/escribe el ID del incidente y puede verlo
+   y derivarlo desde ahí.
+3. El ID debe obtenerse hoy por un canal externo al flujo (ej. consulta
+   directa a base de datos, logs del backend, o coordinación manual con
+   el denunciante/operador) — **no es una solución de UX aceptable a
+   largo plazo**, es el único camino viable sin tocar el backend.
 
 ### Impacto en F.2 (HomeComandoView)
-- El botón "Derivar a CAI" abre un bottom sheet con **una sola opción**:
-  "CAI más cercano (asignación automática)" + botón Confirmar.
-- No se necesita ningún endpoint nuevo para este comportamiento transitorio.
+- El tab "Reportados" (listado automático) se eliminó — era inviable.
+- Se reemplazó por búsqueda manual + acción "Derivar a CAI" funcional.
+
 - El texto del botón/diálogo debe dejar claro que es automático para no
   confundir al operador.
 
-### Endpoint propuesto (para cuando se retome el backend)
+### Endpoints propuestos (para cuando se retome el backend)
+
+**Para el listado de Comando (más urgente que el catálogo de candidatos):**
+```
+GET /api/v1/incidentes?estado=CREADO
+→ requiere rol COMANDO, sin filtro de actorId (Comando ve todos los
+  incidentes pendientes de derivar, sin importar quién los reportó)
+→ 200 + [ IncidenteResponse ]
+```
+
+**Para selección manual de CAI (mejora de UX, no bloqueante):**
 ```
 GET /api/v1/cais/candidatos?incidenteId={id}&limite=3
 → 200 + [ { id, nombre, latitud, longitud, agentesDisponibles, distanciaKm } ]
