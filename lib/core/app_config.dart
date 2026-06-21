@@ -83,4 +83,30 @@ class AppConfig {
     'DEBUG_MODE',
     defaultValue: true,
   );
+
+  // ───────────────────────────────────────────────────────────────────────
+  // Firebase (F.5 — notificaciones push)
+  // ───────────────────────────────────────────────────────────────────────
+
+  /// Controla si la app inicializa Firebase al arrancar.
+  ///
+  /// Default `false` — Firebase requiere `google-services.json` (Android) y
+  /// `firebase_options.dart` (generado por `flutterfire configure`), que no
+  /// se generan automáticamente. Sin esos archivos,
+  /// `Firebase.initializeApp()` lanza una excepción y la app no abre.
+  ///
+  /// Para habilitar Firebase una vez configurado:
+  /// ```
+  /// flutter run --dart-define=FIREBASE_ENABLED=true
+  /// ```
+  ///
+  /// Mientras sea `false`: `main.dart` omite `Firebase.initializeApp()` y
+  /// `SplashView`/`LoginView` omiten el registro del token FCM — el resto
+  /// de la app (auth, incidentes, tracking, reportes) funciona con
+  /// normalidad, ya que F.5 fue diseñado para no bloquear el flujo
+  /// principal si las notificaciones fallan.
+  static const bool firebaseHabilitado = bool.fromEnvironment(
+    'FIREBASE_ENABLED',
+    defaultValue: false,
+  );
 }

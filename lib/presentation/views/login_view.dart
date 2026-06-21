@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_config.dart';
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
 import '../../data/models/enums/rol.dart';
@@ -45,10 +46,9 @@ class _LoginViewState extends State<LoginView> {
     );
 
     if (exito && mounted) {
-      // F.5 — Registrar token FCM solo si el rol es DENUNCIANTE.
-      // (El backend solo usa tokenFcm para denunciantes — los agentes/CAI
-      // no reciben notificaciones push por diseño actual.)
-      if (sesion.rol == Rol.DENUNCIANTE) {
+      // F.5 — Registrar token FCM solo si Firebase está habilitado y el
+      // rol es DENUNCIANTE (el backend solo usa tokenFcm para denunciantes).
+      if (AppConfig.firebaseHabilitado && sesion.rol == Rol.DENUNCIANTE) {
         context.read<NotificacionService>().registrarTokenEnBackend(
               actorId: sesion.actorId!,
             );
