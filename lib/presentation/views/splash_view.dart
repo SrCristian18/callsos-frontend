@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_config.dart';
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
 import '../../data/models/enums/rol.dart';
@@ -50,8 +51,10 @@ class SplashView extends StatelessWidget {
             if (!context.mounted) return;
 
             // F.5 — Si es DENUNCIANTE autenticado, registrar/actualizar
-            // token FCM (puede haber cambiado desde la última sesión).
-            if (sesion.isAuthenticated && sesion.rol == Rol.DENUNCIANTE) {
+            // token FCM. Solo si Firebase está habilitado (ver AppConfig).
+            if (AppConfig.firebaseHabilitado &&
+                sesion.isAuthenticated &&
+                sesion.rol == Rol.DENUNCIANTE) {
               context.read<NotificacionService>().registrarTokenEnBackend(
                     actorId: sesion.actorId!,
                   );

@@ -1,3 +1,4 @@
+import 'package:CallSos/core/app_config.dart';
 import 'package:CallSos/core/app_providers.dart';
 import 'package:CallSos/core/app_routes.dart';
 import 'package:CallSos/core/colores_app.dart';
@@ -31,24 +32,24 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // F.5 — Inicializar Firebase.
+  // F.5 — Inicializar Firebase, SOLO si está habilitado explícitamente.
   //
-  // NOTA: Firebase.initializeApp() requiere que el proyecto esté conectado
-  // a Firebase Console y que existan los archivos de configuración:
-  // - Android: android/app/google-services.json
-  // - iOS:     ios/Runner/GoogleService-Info.plist
+  // AppConfig.firebaseHabilitado es `false` por defecto porque Firebase
+  // requiere `google-services.json` (Android) y `firebase_options.dart`
+  // (generado por `flutterfire configure`), que no se generan
+  // automáticamente. Sin esos archivos, Firebase.initializeApp() lanza
+  // una excepción y la app no abre.
   //
-  // Estos archivos NO se generan automáticamente — deben crearse con
-  // FlutterFire CLI: `flutterfire configure` (ver docs/deuda_backend.md F.5).
+  // Para habilitar una vez configurado Firebase:
+  //   flutter run --dart-define=FIREBASE_ENABLED=true
   //
-  // Mientras no estén configurados, Firebase.initializeApp() lanzará una
-  // excepción. Para continuar el desarrollo sin Firebase, comentar este
-  // bloque temporalmente y las referencias a NotificacionService en
-  // AppProviders.
-  await Firebase.initializeApp();
-
-  // Registrar el handler de background ANTES de runApp.
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  // Mientras esté deshabilitado, el resto de la app (auth, incidentes,
+  // tracking, reportes) funciona con normalidad — F.5 fue diseñado para
+  // no bloquear el flujo principal.
+  if (AppConfig.firebaseHabilitado) {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  }
 
   runApp(const MyApp());
 }
