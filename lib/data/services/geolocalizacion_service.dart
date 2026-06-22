@@ -52,7 +52,12 @@ abstract class IGeolocalizacionService {
   /// - El permiso no fue concedido (llamar [solicitarPermiso] antes).
   /// - El GPS está desactivado.
   /// - Timeout superado sin señal GPS (puede ocurrir en interiores).
-  Future<Ubicacion> obtenerPosicionActual();
+  /// [precisionAlta]: si `true` (por defecto) usa [LocationAccuracy.high]
+  /// con timeout de 15s — para la creación de incidentes donde las
+  /// coordenadas se envían al backend. Si `false`, usa
+  /// [LocationAccuracy.medium] con timeout de 30s — para mostrar la
+  /// posición del denunciante en el mapa de tracking.
+  Future<Ubicacion> obtenerPosicionActual({bool precisionAlta = true});
 
   /// Stream continuo de posiciones GPS para el tracking en tiempo real.
   ///
@@ -109,12 +114,14 @@ class GeolocalizacionService implements IGeolocalizacionService {
   }
 
   @override
-  Future<Ubicacion> obtenerPosicionActual() async {
+  Future<Ubicacion> obtenerPosicionActual({bool precisionAlta = true}) async {
     try {
       final posicion = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
+        locationSettings: LocationSettings(
+          accuracy: precisionAlta
+              ? LocationAccuracy.high    // F.1: creación de incidente
+              : LocationAccuracy.medium, // F.3: marcador del denunciante en tracking
+          timeLimit: Duration(seconds: precisionAlta ? 15 : 30),
         ),
       );
       return Ubicacion(latitud: posicion.latitude, longitud: posicion.longitude);
