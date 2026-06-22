@@ -40,6 +40,7 @@ class _TrackingViewState extends State<TrackingView> {
   Incidente? _incidente;
   bool _cargandoIncidente = true;
   String? _errorCarga;
+  bool _inicializado = false; // guard: didChangeDependencies puede llamarse N veces
 
   @override
   void initState() {
@@ -55,10 +56,14 @@ class _TrackingViewState extends State<TrackingView> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_inicializado) return; // ya inicializado — ignorar llamadas subsecuentes
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final incidenteId = args?['incidenteId'] as String? ?? '';
-    if (incidenteId.isNotEmpty) _inicializar(incidenteId);
+    if (incidenteId.isNotEmpty) {
+      _inicializado = true;
+      _inicializar(incidenteId);
+    }
   }
 
   Future<void> _inicializar(String incidenteId) async {
@@ -96,6 +101,8 @@ class _TrackingViewState extends State<TrackingView> {
     );
 
     // 3 — escuchar actualizaciones de posición para mover el mapa
+    // removeListener primero para evitar duplicados si se reintenta
+    _vm.removeListener(_onPosicionActualizada);
     _vm.addListener(_onPosicionActualizada);
   }
 
@@ -217,14 +224,14 @@ class _TrackingViewState extends State<TrackingView> {
 
               MarkerLayer(
                 markers: [
-                  // Marcador del punto de emergencia (estático)
-                  if (_incidente != null)
+                  // Marcador del denunciante (estático — posición inicial)
+                  // Va primero: si coincide con la emergencia, queda debajo
+                  if (vm.posicionDenunciante != null)
                     Marker(
-                      point: LatLng(
-                          _incidente!.latitud, _incidente!.longitud),
-                      width: 40,
-                      height: 40,
-                      child: const _MarcadorEmergencia(),
+                      point: vm.posicionDenunciante!,
+                      width: 36,
+                      height: 36,
+                      child: const _MarcadorDenunciante(),
                     ),
 
                   // Marcador del agente (actualizado en tiempo real)
@@ -236,13 +243,15 @@ class _TrackingViewState extends State<TrackingView> {
                       child: const _MarcadorAgente(),
                     ),
 
-                  // Marcador del denunciante (estático — posición inicial)
-                  if (vm.posicionDenunciante != null)
+                  // Marcador del punto de emergencia (estático)
+                  // Va ÚLTIMO para que siempre quede visible encima de los demás
+                  if (_incidente != null)
                     Marker(
-                      point: vm.posicionDenunciante!,
-                      width: 36,
-                      height: 36,
-                      child: const _MarcadorDenunciante(),
+                      point: LatLng(
+                          _incidente!.latitud, _incidente!.longitud),
+                      width: 40,
+                      height: 40,
+                      child: const _MarcadorEmergencia(),
                     ),
                 ],
               ),

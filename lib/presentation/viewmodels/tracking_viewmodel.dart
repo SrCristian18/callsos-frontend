@@ -86,8 +86,34 @@ class TrackingViewModel extends ChangeNotifier {
     _rol = rol;
 
     if (posicionInicial != null) {
-      _posicionDenunciante =
-          LatLng(posicionInicial.latitud, posicionInicial.longitud);
+      // posicionInicial = coordenadas del incidente (punto de la emergencia).
+      // Para el DENUNCIANTE, intentamos obtener su posición GPS actual para
+      // que el marcador naranja refleje dónde está él realmente.
+      // Si el GPS falla, NO usamos las coordenadas del incidente como fallback
+      // (coincidiría con el marcador rojo y quedaría tapado) — simplemente
+      // no mostramos el marcador naranja hasta que el GPS esté disponible.
+      if (rol == Rol.DENUNCIANTE) {
+        try {
+          // Solicitar permiso antes de obtener posición — TrackingView
+          // puede abrirse sin haber pasado por el botón de pánico (que es
+          // el único lugar donde se solicitaba el permiso antes).
+          final permiso = await _geo.solicitarPermiso();
+          if (permiso == PermisoGpsResultado.concedido) {
+            final posActual =
+                await _geo.obtenerPosicionActual(precisionAlta: false);
+            _posicionDenunciante =
+                LatLng(posActual.latitud, posActual.longitud);
+            notifyListeners();
+          }
+          // Si no se concede el permiso, _posicionDenunciante queda null
+          // y simplemente no se muestra el marcador naranja.
+        } catch (_) {
+          // GPS no disponible — marcador naranja no se muestra.
+        }
+      } else {
+        _posicionDenunciante =
+            LatLng(posicionInicial.latitud, posicionInicial.longitud);
+      }
     }
 
     _setConexion(TrackingConexionEstado.conectando);
