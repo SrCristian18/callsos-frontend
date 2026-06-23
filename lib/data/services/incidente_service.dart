@@ -63,6 +63,10 @@ abstract class IIncidenteService {
   /// `GET /incidentes/por-cai` — panel de operaciones del CAI autenticado.
   Future<List<Incidente>> porCai();
 
+  /// FIX Gap 2 — nuevo endpoint para COMANDO.
+  /// GET /incidentes/por-estado?estado={estado}
+  Future<List<Incidente>> porEstado(EstadoIncidente estado);
+
   /// `PATCH /incidentes/{id}/estado` — cambio de estado genérico.
   ///
   /// Body: `{"nuevoEstado": "<EstadoIncidente>"}`. Usado principalmente
@@ -156,6 +160,13 @@ class IncidenteService implements IIncidenteService {
   @override
   Future<List<Incidente>> porCai() async {
     final data = await _client.get('/incidentes/por-cai');
+    return _aListaDeIncidentes(data);
+  }
+
+  @override
+  Future<List<Incidente>> porEstado(EstadoIncidente estado) async {
+    final data = await _client.get(
+        '/incidentes/por-estado?estado=${estado.name}');
     return _aListaDeIncidentes(data);
   }
 
