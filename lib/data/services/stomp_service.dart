@@ -101,8 +101,14 @@ abstract class IStompService {
 /// (ver [AppConfig.wsBaseUrl]).
 ///
 /// Autenticación: el JWT se envía en el header STOMP `Authorization`
-/// (frame CONNECT), paralelo al header HTTP. Spring Security valida el
-/// JWT en el handshake del WebSocket via el mismo [JwtAuthFilter].
+/// (frame CONNECT). A diferencia de los endpoints REST (donde
+/// JwtAuthFilter valida el JWT vía un filtro de Servlet sobre el
+/// handshake HTTP), el WebSocket usa un mecanismo separado:
+/// StompAuthChannelInterceptor intercepta el frame CONNECT de STOMP
+/// (protocolo aparte del handshake HTTP) y valida el JWT ahí. El
+/// handshake HTTP en sí (/ws/**) está en permitAll() a propósito,
+/// porque no todos los clientes garantizan poder enviar headers custom
+/// en esa etapa — la autenticación real ocurre en el CONNECT de STOMP.
 class StompService implements IStompService {
   final ITokenProvider? tokenProvider;
 
