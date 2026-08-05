@@ -139,14 +139,21 @@ class StompService implements IStompService {
         stompConnectHeaders: stompHeaders,
         webSocketConnectHeaders: stompHeaders,
         onConnect: (frame) {
+          print("✅ STOMP CONECTADO");
           _conectado = true;
           onConnected();
         },
         onStompError: (frame) {
+          print("❌ STOMP ERROR");
+          print(frame.body);
+
           _conectado = false;
           onError(frame.body ?? 'Error STOMP desconocido');
         },
         onWebSocketError: (error) {
+          print("❌ WEBSOCKET ERROR");
+          print(error);
+
           _conectado = false;
           onError('Error WebSocket: $error');
         },
