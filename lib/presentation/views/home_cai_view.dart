@@ -3,8 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
+import '../../data/models/agente_disponible.dart';
 import '../../data/models/enums/estado_incidente.dart';
 import '../../data/models/incidente.dart';
+import '../../data/services/api_exception.dart';
+import '../../data/services/cai_service.dart';
 import '../../data/services/incidente_service.dart';
 import '../viewmodels/incidente_list_viewmodel.dart';
 import '../viewmodels/sesion_viewmodel.dart';
@@ -51,11 +54,18 @@ class _HomeCAIViewState extends State<HomeCAIView>
 
   Future<void> _mostrarAsignacionAgente(
       BuildContext context, Incidente incidente) async {
+    final sesion = context.read<SesionViewModel>();
+    final caiService = context.read<ICaiService>();
+
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => _BottomSheetAsignarAgente(incidente: incidente),
+      builder: (_) => _BottomSheetAsignarAgente(
+        incidente: incidente,
+        caiId: sesion.actorId ?? '',
+        caiService: caiService,
+      ),
     );
 
     if (confirmed == true && context.mounted) {
@@ -172,13 +182,61 @@ class _HomeCAIViewState extends State<HomeCAIView>
   }
 }
 
-/// Bottom sheet de asignación de agente (opción única automática — F.0.7).
-class _BottomSheetAsignarAgente extends StatelessWidget {
+/// Bottom sheet de asignación de agente.
+///
+/// FIX Gap 3 (deuda_backend.md): ahora muestra la lista REAL de agentes
+/// disponibles del CAI (antes solo mostraba el mensaje genérico de
+/// "asignación automática" sin ningún dato real detrás).
+///
+/// La asignación en sí SIGUE siendo automática — el backend todavía no
+/// expone un endpoint para elegir manualmente un agente específico
+/// (ver PATCH /{id}/asignar en IncidenteController). Esta lista es
+/// informativa: el operador ve a quién probablemente se le asignará
+/// antes de confirmar, y el botón queda deshabilitado si no hay nadie
+/// disponible (evita un 422 innecesario contra el backend).
+class _BottomSheetAsignarAgente extends StatefulWidget {
   final Incidente incidente;
-  const _BottomSheetAsignarAgente({required this.incidente});
+  final String caiId;
+  final ICaiService caiService;
+
+  const _BottomSheetAsignarAgente({
+    required this.incidente,
+    required this.caiId,
+    required this.caiService,
+  });
+
+  @override
+  State<_BottomSheetAsignarAgente> createState() =>
+      _BottomSheetAsignarAgenteState();
+}
+
+class _BottomSheetAsignarAgenteState
+    extends State<_BottomSheetAsignarAgente> {
+  List<AgenteDisponible>? _agentes;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarAgentes();
+  }
+
+  Future<void> _cargarAgentes() async {
+    try {
+      final agentes = await widget.caiService.agentesDisponibles(widget.caiId);
+      if (mounted) setState(() => _agentes = agentes);
+    } on ApiException catch (e) {
+      // No bloqueamos el flujo de asignación si esta consulta informativa
+      // falla — el botón de asignación automática sigue funcionando igual
+      // que antes de este fix.
+      if (mounted) setState(() => _error = e.message);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final sinAgentes = _agentes != null && _agentes!.isEmpty;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       child: Column(
@@ -203,7 +261,56 @@ class _BottomSheetAsignarAgente extends StatelessWidget {
             style: TextStyle(color: Colors.grey, fontSize: 13),
           ),
           const SizedBox(height: 16),
-          // Opción única (F.0.7 gap 3 — deuda de backend)
+
+          // Lista real de agentes disponibles (informativa).
+          if (_agentes == null && _error == null)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else if (_error != null)
+            Text(
+              'No se pudo cargar la lista de agentes ($_error). '
+              'La asignación automática sigue disponible.',
+              style: TextStyle(color: Colors.orange.shade800, fontSize: 12),
+            )
+          else if (sinAgentes)
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: Colors.red.shade700),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'No hay agentes disponibles en este CAI en este momento.',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                ),
+              ]),
+            )
+          else
+            ..._agentes!.map((a) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(children: [
+                    Icon(Icons.person, size: 18, color: Colors.green.shade700),
+                    const SizedBox(width: 8),
+                    Text(a.nombre, style: const TextStyle(fontSize: 13)),
+                  ]),
+                )),
+
+          const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -242,7 +349,12 @@ class _BottomSheetAsignarAgente extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),
               ),
-              onPressed: () => Navigator.pop(context, true),
+              // Deshabilitado solo si confirmamos que no hay nadie
+              // disponible; si la consulta falló (_error != null) dejamos
+              // intentar igual, porque el backend es la fuente de verdad.
+              onPressed: sinAgentes
+                  ? null
+                  : () => Navigator.pop(context, true),
               child: const Text('Confirmar asignación',
                   style: TextStyle(fontWeight: FontWeight.bold)),
             ),

@@ -6,6 +6,7 @@ import 'package:CallSos/data/models/enums/estado_agente.dart';
 import 'package:CallSos/data/models/enums/rol.dart';
 import 'package:CallSos/data/services/api_client.dart';
 import 'package:CallSos/data/services/auth_service.dart';
+import 'package:CallSos/data/services/cai_service.dart';
 import 'package:CallSos/data/services/denunciante_service.dart';
 import 'package:CallSos/data/services/geolocalizacion_service.dart';
 import 'package:CallSos/data/services/incidente_service.dart';
@@ -67,6 +68,9 @@ class AppProviders {
       ),
       Provider<IDenuncianteService>(
         create: (_) => DenuncianteService(apiClient),
+      ),
+      Provider<ICaiService>(
+        create: (_) => CaiService(apiClient),
       ),
 
       // ── F.5 — Notificaciones push ───────────────────────────────────
