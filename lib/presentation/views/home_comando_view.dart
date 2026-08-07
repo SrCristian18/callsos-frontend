@@ -201,7 +201,7 @@ class _HomeComandoViewState extends State<HomeComandoView>
               const Text('Centro de Comando',
                   style: TextStyle(
                       color: Colors.white, fontWeight: FontWeight.bold)),
-              Text(sesion.nombrePlaceholder,
+              Text(sesion.nombreMostrar,
                   style:
                       const TextStyle(color: Colors.white70, fontSize: 12)),
             ],

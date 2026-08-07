@@ -33,11 +33,11 @@ import '../../data/services/token_provider.dart';
 /// apiClient.tokenProvider = sesion;
 /// ```
 ///
-/// ## Placeholder de "nombre" (decisión registrada en este chat)
-/// El backend (`AuthResponse`) NO devuelve `nombre` del usuario — solo
-/// `{token, actorId, rol}`. Mientras esa deuda de backend no se resuelva
-/// (ver F.0.7), la UI debe usar [nombrePlaceholder] en los lugares donde
-/// antes se mostraba `AgentePolicia.nombre`.
+/// ## Nombre del usuario (FIX Gap 4 — antes placeholder, ver deuda_backend.md)
+/// `AuthResponse` ahora incluye `nombre` (backend: tabla `usuarios`,
+/// columna agregada en `05_perfil_usuario.sql`). Puede seguir siendo
+/// `null` para cuentas muy antiguas sin backfill — [nombreMostrar] hace
+/// fallback al formato placeholder anterior en ese caso.
 class SesionViewModel extends ChangeNotifier implements ITokenProvider {
   final IAuthService _authService;
   final ISecureStorage _storage;
@@ -55,6 +55,7 @@ class SesionViewModel extends ChangeNotifier implements ITokenProvider {
   static const _kTokenKey = 'callsos_jwt_token';
   static const _kActorIdKey = 'callsos_actor_id';
   static const _kRolKey = 'callsos_rol';
+  static const _kNombreKey = 'callsos_nombre';
 
   // ───────────────────────────────────────────────────────────────────────
   // Estado
@@ -63,6 +64,7 @@ class SesionViewModel extends ChangeNotifier implements ITokenProvider {
   String? _token;
   String? _actorId;
   Rol? _rol;
+  String? _nombre;
 
   /// `true` mientras se ejecuta [login] o [restaurarSesion].
   ///
@@ -97,15 +99,14 @@ class SesionViewModel extends ChangeNotifier implements ITokenProvider {
   /// token no expirado).
   bool get isAuthenticated => _token != null && _actorId != null && _rol != null;
 
-  /// Placeholder de presentación para el "nombre" del usuario.
-  ///
-  /// DEUDA DE BACKEND (F.0.7): `AuthResponse` no incluye `nombre`. Mientras
-  /// no exista un endpoint de perfil, se muestra la etiqueta del rol más un
-  /// fragmento del `actorId` (ej. "Agente de Policía • agente-0").
+  /// Nombre real del usuario (FIX Gap 4) — con fallback al formato
+  /// placeholder anterior si `nombre` vino `null` desde el backend
+  /// (cuentas semilla sin backfill).
   ///
   /// Devuelve cadena vacía si no hay sesión activa.
-  String get nombrePlaceholder {
+  String get nombreMostrar {
     if (!isAuthenticated) return '';
+    if (_nombre != null && _nombre!.trim().isNotEmpty) return _nombre!;
     final id = _actorId!;
     final idCorto = id.length > 8 ? id.substring(0, 8) : id;
     return '${_rol!.etiqueta} • $idCorto';
@@ -140,6 +141,9 @@ class SesionViewModel extends ChangeNotifier implements ITokenProvider {
         _token = token;
         _actorId = actorId;
         _rol = rolFromJson(rolGuardado);
+        // nombre es opcional — su ausencia no invalida la sesión, solo
+        // hace que nombreMostrar recurra al fallback de placeholder.
+        _nombre = await _storage.read(_kNombreKey);
       } else {
         await _limpiarStorage();
         _limpiarEstado();
@@ -272,18 +276,25 @@ class SesionViewModel extends ChangeNotifier implements ITokenProvider {
     }
   }
 
-  /// Persiste `{token, actorId, rol}` en memoria + almacenamiento seguro.
-  /// Compartido por [login], [registrarDenunciante] y [registrarAgente]
-  /// porque los tres devuelven el mismo [AuthResult] y deben dejar la
-  /// sesión en el mismo estado tras autenticarse.
+  /// Persiste `{token, actorId, rol, nombre}` en memoria + almacenamiento
+  /// seguro. Compartido por [login], [registrarDenunciante] y
+  /// [registrarAgente] porque los tres devuelven el mismo [AuthResult] y
+  /// deben dejar la sesión en el mismo estado tras autenticarse.
   Future<void> _aplicarResultadoAutenticacion(AuthResult resultado) async {
     _token = resultado.token;
     _actorId = resultado.actorId;
     _rol = resultado.rol;
+    _nombre = resultado.nombre;
 
     await _storage.write(_kTokenKey, resultado.token);
     await _storage.write(_kActorIdKey, resultado.actorId);
     await _storage.write(_kRolKey, resultado.rol.toJson());
+    // nombre puede ser null (cuentas semilla sin backfill) — no persistir
+    // la clave en ese caso, para que restaurarSesion() la trate igual que
+    // "nunca se guardó" y nombreMostrar recurra al fallback correctamente.
+    if (resultado.nombre != null) {
+      await _storage.write(_kNombreKey, resultado.nombre!);
+    }
   }
 
   /// Cierra la sesión: limpia el estado en memoria y el almacenamiento
@@ -303,12 +314,14 @@ class SesionViewModel extends ChangeNotifier implements ITokenProvider {
     _token = null;
     _actorId = null;
     _rol = null;
+    _nombre = null;
   }
 
   Future<void> _limpiarStorage() async {
     await _storage.delete(_kTokenKey);
     await _storage.delete(_kActorIdKey);
     await _storage.delete(_kRolKey);
+    await _storage.delete(_kNombreKey);
   }
 
   /// `true` si el JWT ya expiró (o no se puede determinar su vigencia).
