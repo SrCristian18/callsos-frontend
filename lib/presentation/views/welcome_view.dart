@@ -1,7 +1,5 @@
 import 'package:CallSos/core/app_routes.dart';
-import 'package:CallSos/presentation/viewmodels/login_viewmodel.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../core/colores_app.dart';
 class WelcomeView extends StatelessWidget {
   const WelcomeView({super.key});
@@ -50,7 +48,6 @@ class WelcomeView extends StatelessWidget {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                       ),
                       onPressed: () {
-                        Provider.of<LoginViewModel>(context, listen: false).resetForm();
                         if(role == 'policia') Navigator.pushNamed(context, AppRoutes.loginPolicia);
                         else Navigator.pushNamed(context, AppRoutes.loginDenunciante);
                       },
@@ -67,7 +64,6 @@ class WelcomeView extends StatelessWidget {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                       ),
                       onPressed: () {
-                        Provider.of<LoginViewModel>(context, listen: false).resetForm();
                         if(role == 'policia') Navigator.pushNamed(context, AppRoutes.registerPolicia);
                         else Navigator.pushNamed(context, AppRoutes.registerDenunciante);
                       },

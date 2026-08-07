@@ -1,7 +1,5 @@
 import 'package:CallSos/core/app_routes.dart';
-import 'package:CallSos/presentation/viewmodels/login_viewmodel.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../core/colores_app.dart';
 
 class RoleSelectionView extends StatelessWidget {
@@ -28,7 +26,6 @@ class RoleSelectionView extends StatelessWidget {
                 title: "Denunciante",
                 icon: Icons.person_search,
                 onTap: () {
-                  Provider.of<LoginViewModel>(context, listen: false).resetForm();
                   Navigator.pushNamed(context, AppRoutes.welcome, arguments: 'denunciante');
                 },
               ),
@@ -40,7 +37,6 @@ class RoleSelectionView extends StatelessWidget {
                 title: "Agente de policía / CAI",
                 icon: Icons.local_police,
                 onTap: () {
-                  Provider.of<LoginViewModel>(context, listen: false).resetForm();  
                   Navigator.pushNamed(context, AppRoutes.welcome, arguments: 'policia');
                 },
               ),

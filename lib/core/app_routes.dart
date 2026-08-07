@@ -15,9 +15,6 @@ import 'package:CallSos/presentation/views/home_comando_view.dart';
 import 'package:CallSos/presentation/views/detalle_incidente_view.dart';
 import 'package:CallSos/presentation/views/tracking_view.dart';
 import 'package:CallSos/presentation/views/reporte_hallazgos_view.dart';
-// Vistas legacy (mantenidas temporalmente para no romper flujos existentes):
-import 'package:CallSos/presentation/views/incidente_view.dart';
-import 'package:CallSos/presentation/views/reporte_view.dart';
 
 /// Mapa de navegación completo de CallSOS.
 ///
@@ -33,8 +30,13 @@ import 'package:CallSos/presentation/views/reporte_view.dart';
 ///   `/home_comando`.
 /// - Flujo de incidente: `/detalle_incidente`, `/tracking`,
 ///   `/reporte_hallazgos`.
-/// - Legacy (a retirar cuando F.2 esté completa): `/incident_view`,
-///   `/report_view`.
+///
+/// Épica 3 (integración funcional completa): se retiraron las rutas legacy
+/// `/incident_view` y `/report_view` — llevaban a pantallas con datos mock
+/// en memoria (IncidenteView/ReporteView + IncidenteViewModel/
+/// ReporteViewModel legacy), inalcanzables desde ningún flujo real de
+/// navegación (confirmado: ningún Navigator.pushNamed las referenciaba).
+/// Las Home views reales por rol (F.2) ya cubren esa funcionalidad.
 class AppRoutes {
   AppRoutes._();
 
@@ -61,10 +63,6 @@ class AppRoutes {
   static const String tracking          = '/tracking';
   static const String reporteHallazgos  = '/reporte_hallazgos';
 
-  // ── Legacy (deprecadas — se retiran en F.2) ─────────────────────────────
-  static const String incidentView  = '/incident_view';
-  static const String reportView    = '/report_view';
-
   static Map<String, WidgetBuilder> get routes => {
     // Splash
     splash:               (_) => const SplashView(),
@@ -88,9 +86,5 @@ class AppRoutes {
     detalleIncidente:     (_) => const DetalleIncidenteView(),
     tracking:             (_) => const TrackingView(),
     reporteHallazgos:     (_) => const ReporteHallazgosView(),
-
-    // Legacy
-    incidentView:         (_) => const IncidenteView(),
-    reportView:           (_) => const ReporteView(),
   };
 }
