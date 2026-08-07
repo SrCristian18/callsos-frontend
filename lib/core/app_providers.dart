@@ -1,9 +1,6 @@
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
-import 'package:CallSos/data/models/agente_policia.dart';
-import 'package:CallSos/data/models/enums/estado_agente.dart';
-import 'package:CallSos/data/models/enums/rol.dart';
 import 'package:CallSos/data/services/api_client.dart';
 import 'package:CallSos/data/services/auth_service.dart';
 import 'package:CallSos/data/services/cai_service.dart';
@@ -14,34 +11,17 @@ import 'package:CallSos/data/services/notificacion_service.dart';
 import 'package:CallSos/data/services/reporte_service.dart';
 import 'package:CallSos/data/services/stomp_service.dart';
 import 'package:CallSos/presentation/viewmodels/crear_incidente_viewmodel.dart';
-import 'package:CallSos/presentation/viewmodels/incidente_viewmodel.dart';
-import 'package:CallSos/presentation/viewmodels/login_viewmodel.dart';
-import 'package:CallSos/presentation/viewmodels/register_policia_viewmodel.dart';
-import 'package:CallSos/presentation/viewmodels/reporte_viewmodel.dart';
 import 'package:CallSos/presentation/viewmodels/sesion_viewmodel.dart';
 
-/// Construye un [AgentePolicia] desde la sesión activa.
-///
-/// DEUDA DE BACKEND (F.0.7): `cai` y `estadoAgente` son placeholders
-/// porque `AuthResponse` no expone perfil completo del agente. "nombre"
-/// SÍ es real ahora (FIX Gap 4) vía `sesion.nombreMostrar`.
-AgentePolicia _agentePoliciaDesdeSesion(SesionViewModel sesion) {
-  if (!sesion.isAuthenticated) {
-    return AgentePolicia(
-      id: '',
-      nombre: '',
-      rol: Rol.DENUNCIANTE,
-      estadoAgente: EstadoAgente.DISPONIBLE,
-    );
-  }
-  return AgentePolicia(
-    id: sesion.actorId!,
-    nombre: sesion.nombreMostrar,
-    rol: sesion.rol!,
-    cai: 'CAI San Francisco', // TODO(F.0.7): placeholder
-    estadoAgente: EstadoAgente.DISPONIBLE, // TODO(F.0.7): placeholder
-  );
-}
+/// Épica 3 (integración funcional completa): se retiraron de este archivo
+/// los providers de LoginViewModel, ReporteViewModel,
+/// RegisterPoliciaViewModel e IncidenteViewModel (legacy) — sus únicos
+/// consumidores eran IncidenteView/ReporteView (rutas legacy ya
+/// eliminadas, ver app_routes.dart) y 3 widgets huérfanos
+/// (comando_widget/jefecai_widget/agente_widget), confirmados
+/// inalcanzables desde cualquier flujo real de navegación. Con ellos se
+/// fue también `_agentePoliciaDesdeSesion`, que solo alimentaba al
+/// IncidenteViewModel legacy.
 
 class AppProviders {
   static List<SingleChildWidget> get providers {
@@ -50,11 +30,6 @@ class AppProviders {
     final authService = AuthService(apiClient);
 
     return [
-      // ── ViewModels legacy (mantener hasta retiro post-F.7) ─────────
-      ChangeNotifierProvider(create: (_) => LoginViewModel()),
-      ChangeNotifierProvider(create: (_) => ReporteViewModel()),
-      ChangeNotifierProvider(create: (_) => RegisterPoliciaViewModel()),
-
       // ── F.0.6 — Geolocalización ─────────────────────────────────────
       Provider<IGeolocalizacionService>(
         create: (_) => GeolocalizacionService(),
@@ -123,22 +98,6 @@ class AppProviders {
               incidenteService: incidenteService,
               geoService: geoService,
             ),
-      ),
-
-      // ── F.0.4 — IncidenteViewModel sincronizado con la sesión ────────
-      ChangeNotifierProxyProvider<SesionViewModel, IncidenteViewModel>(
-        create: (context) => IncidenteViewModel(
-          currentUser:
-              _agentePoliciaDesdeSesion(context.read<SesionViewModel>()),
-        ),
-        update: (_, sesion, previous) {
-          final usuario = _agentePoliciaDesdeSesion(sesion);
-          if (previous == null) {
-            return IncidenteViewModel(currentUser: usuario);
-          }
-          previous.actualizarUsuario(usuario);
-          return previous;
-        },
       ),
     ];
   }
