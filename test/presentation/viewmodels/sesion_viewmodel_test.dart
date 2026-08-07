@@ -81,6 +81,32 @@ void main() {
       expect(sesion.rol, Rol.AGENTE);
     });
 
+    test('restaura también el nombre si estaba persistido (FIX Gap 4)', () async {
+      final jwt = _crearJwt({'sub': 'agente-001', 'rol': 'AGENTE', 'exp': _expEnHoras(24)});
+      await storage.write('callsos_jwt_token', jwt);
+      await storage.write('callsos_actor_id', 'agente-001');
+      await storage.write('callsos_rol', 'AGENTE');
+      await storage.write('callsos_nombre', 'Pedro Gómez');
+
+      await sesion.restaurarSesion();
+
+      expect(sesion.isAuthenticated, isTrue);
+      expect(sesion.nombreMostrar, 'Pedro Gómez');
+    });
+
+    test('nombre ausente en storage no impide restaurar la sesión (opcional)', () async {
+      final jwt = _crearJwt({'sub': 'agente-001', 'rol': 'AGENTE', 'exp': _expEnHoras(24)});
+      await storage.write('callsos_jwt_token', jwt);
+      await storage.write('callsos_actor_id', 'agente-001');
+      await storage.write('callsos_rol', 'AGENTE');
+      // Sin 'callsos_nombre' a propósito — cuenta semilla sin backfill.
+
+      await sesion.restaurarSesion();
+
+      expect(sesion.isAuthenticated, isTrue);
+      expect(sesion.nombreMostrar, contains(Rol.AGENTE.etiqueta)); // fallback
+    });
+
     test('token expirado -> no autentica y limpia el storage', () async {
       final jwt = _crearJwt({'sub': 'agente-001', 'rol': 'AGENTE', 'exp': _expEnHoras(-1)});
       await storage.write('callsos_jwt_token', jwt);
@@ -124,6 +150,7 @@ void main() {
                 token: 'jwt-de-prueba',
                 actorId: 'agente-001',
                 rol: Rol.AGENTE,
+                nombre: 'Pedro Gómez',
               ));
 
       final exito = await sesion.login(username: 'pedro.agente', password: 'password123');
@@ -140,6 +167,22 @@ void main() {
       expect(await storage.read('callsos_jwt_token'), 'jwt-de-prueba');
       expect(await storage.read('callsos_actor_id'), 'agente-001');
       expect(await storage.read('callsos_rol'), 'AGENTE');
+      // FIX Gap 4: nombre real también se persiste.
+      expect(await storage.read('callsos_nombre'), 'Pedro Gómez');
+    });
+
+    test('login exitoso SIN nombre (cuenta sin backfill) no persiste la clave', () async {
+      when(() => authService.login(username: 'pedro.agente', password: 'password123'))
+          .thenAnswer((_) async => const AuthResult(
+                token: 'jwt-de-prueba',
+                actorId: 'agente-001',
+                rol: Rol.AGENTE,
+                // nombre: null a propósito
+              ));
+
+      await sesion.login(username: 'pedro.agente', password: 'password123');
+
+      expect(await storage.read('callsos_nombre'), isNull);
     });
 
     test('login fallido (credenciales inválidas) -> errorMessage seteado, no autenticado', () async {
@@ -209,22 +252,36 @@ void main() {
     });
   });
 
-  group('nombrePlaceholder', () {
+  group('nombreMostrar', () {
     test('cadena vacía si no hay sesión activa', () {
-      expect(sesion.nombrePlaceholder, isEmpty);
+      expect(sesion.nombreMostrar, isEmpty);
     });
 
-    test('incluye la etiqueta del rol y un fragmento del actorId si hay sesión', () async {
+    test('sin nombre real -> fallback: etiqueta del rol + fragmento del actorId', () async {
       when(() => authService.login(username: 'pedro.agente', password: 'password123'))
           .thenAnswer((_) async => const AuthResult(
                 token: 'jwt-valido',
                 actorId: 'agente-001-test',
                 rol: Rol.AGENTE,
+                // nombre: null a propósito -> fuerza el fallback
               ));
       await sesion.login(username: 'pedro.agente', password: 'password123');
 
-      expect(sesion.nombrePlaceholder, contains(Rol.AGENTE.etiqueta));
-      expect(sesion.nombrePlaceholder, contains('agente-0')); // primeros 8 chars
+      expect(sesion.nombreMostrar, contains(Rol.AGENTE.etiqueta));
+      expect(sesion.nombreMostrar, contains('agente-0')); // primeros 8 chars
+    });
+
+    test('con nombre real -> lo usa directamente, sin fallback', () async {
+      when(() => authService.login(username: 'pedro.agente', password: 'password123'))
+          .thenAnswer((_) async => const AuthResult(
+                token: 'jwt-valido',
+                actorId: 'agente-001-test',
+                rol: Rol.AGENTE,
+                nombre: 'Pedro Gómez',
+              ));
+      await sesion.login(username: 'pedro.agente', password: 'password123');
+
+      expect(sesion.nombreMostrar, 'Pedro Gómez');
     });
   });
 }

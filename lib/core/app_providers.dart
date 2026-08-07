@@ -23,7 +23,8 @@ import 'package:CallSos/presentation/viewmodels/sesion_viewmodel.dart';
 /// Construye un [AgentePolicia] desde la sesión activa.
 ///
 /// DEUDA DE BACKEND (F.0.7): `cai` y `estadoAgente` son placeholders
-/// porque `AuthResponse` no expone perfil completo del agente.
+/// porque `AuthResponse` no expone perfil completo del agente. "nombre"
+/// SÍ es real ahora (FIX Gap 4) vía `sesion.nombreMostrar`.
 AgentePolicia _agentePoliciaDesdeSesion(SesionViewModel sesion) {
   if (!sesion.isAuthenticated) {
     return AgentePolicia(
@@ -35,7 +36,7 @@ AgentePolicia _agentePoliciaDesdeSesion(SesionViewModel sesion) {
   }
   return AgentePolicia(
     id: sesion.actorId!,
-    nombre: sesion.nombrePlaceholder,
+    nombre: sesion.nombreMostrar,
     rol: sesion.rol!,
     cai: 'CAI San Francisco', // TODO(F.0.7): placeholder
     estadoAgente: EstadoAgente.DISPONIBLE, // TODO(F.0.7): placeholder

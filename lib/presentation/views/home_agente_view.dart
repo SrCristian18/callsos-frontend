@@ -111,7 +111,7 @@ class _HomeAgenteViewState extends State<HomeAgenteView> {
                   style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold)),
-              Text(sesion.nombrePlaceholder,
+              Text(sesion.nombreMostrar,
                   style: const TextStyle(
                       color: Colors.white70, fontSize: 12)),
             ],
