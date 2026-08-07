@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import '../../data/models/auth_result.dart';
 import '../../data/models/enums/rol.dart';
 import '../../data/services/api_exception.dart';
 import '../../data/services/auth_service.dart';
@@ -172,15 +173,7 @@ class SesionViewModel extends ChangeNotifier implements ITokenProvider {
 
     try {
       final resultado = await _authService.login(username: username, password: password);
-
-      _token = resultado.token;
-      _actorId = resultado.actorId;
-      _rol = resultado.rol;
-
-      await _storage.write(_kTokenKey, resultado.token);
-      await _storage.write(_kActorIdKey, resultado.actorId);
-      await _storage.write(_kRolKey, resultado.rol.toJson());
-
+      await _aplicarResultadoAutenticacion(resultado);
       _isLoading = false;
       notifyListeners();
       return true;
@@ -195,6 +188,102 @@ class SesionViewModel extends ChangeNotifier implements ITokenProvider {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Registro abierto de DENUNCIANTE + autologueo — mismo patrón que
+  /// [login], reutilizando [_aplicarResultadoAutenticacion] para no
+  /// duplicar la lógica de persistencia de sesión.
+  Future<bool> registrarDenunciante({
+    required String nombre,
+    required String apellido,
+    required String documento,
+    required String telefono,
+    required String password,
+    required String confirmarPassword,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final resultado = await _authService.registrarDenunciante(
+        nombre: nombre,
+        apellido: apellido,
+        documento: documento,
+        telefono: telefono,
+        password: password,
+        confirmarPassword: confirmarPassword,
+      );
+      await _aplicarResultadoAutenticacion(resultado);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (_) {
+      _errorMessage = 'Ocurrió un error inesperado. Inténtalo de nuevo.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Registro de AGENTE mediante token de invitación + autologueo.
+  /// El CAI nunca se envía desde acá — lo resuelve el backend a partir
+  /// del token.
+  Future<bool> registrarAgente({
+    required String token,
+    required String nombre,
+    required String telefono,
+    required String username,
+    required String password,
+    required String confirmarPassword,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final resultado = await _authService.registrarAgente(
+        token: token,
+        nombre: nombre,
+        telefono: telefono,
+        username: username,
+        password: password,
+        confirmarPassword: confirmarPassword,
+      );
+      await _aplicarResultadoAutenticacion(resultado);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (_) {
+      _errorMessage = 'Ocurrió un error inesperado. Inténtalo de nuevo.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Persiste `{token, actorId, rol}` en memoria + almacenamiento seguro.
+  /// Compartido por [login], [registrarDenunciante] y [registrarAgente]
+  /// porque los tres devuelven el mismo [AuthResult] y deben dejar la
+  /// sesión en el mismo estado tras autenticarse.
+  Future<void> _aplicarResultadoAutenticacion(AuthResult resultado) async {
+    _token = resultado.token;
+    _actorId = resultado.actorId;
+    _rol = resultado.rol;
+
+    await _storage.write(_kTokenKey, resultado.token);
+    await _storage.write(_kActorIdKey, resultado.actorId);
+    await _storage.write(_kRolKey, resultado.rol.toJson());
   }
 
   /// Cierra la sesión: limpia el estado en memoria y el almacenamiento

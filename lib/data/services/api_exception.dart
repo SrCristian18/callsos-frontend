@@ -104,6 +104,9 @@ class ApiException implements Exception {
               'No se pudo conectar con el servidor. '
               'Verifica tu conexión a internet e inténtalo de nuevo.',
         );
+      case DioExceptionType.transformTimeout:
+        // TODO: Handle this case.
+        throw UnimplementedError();
     }
   }
 

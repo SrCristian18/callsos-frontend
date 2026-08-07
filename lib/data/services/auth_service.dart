@@ -19,6 +19,31 @@ abstract class IAuthService {
     required String username,
     required String password,
   });
+
+  /// Registro abierto de DENUNCIANTE — espejo de
+  /// `POST /auth/registro/denunciante`. `documento` funciona como
+  /// username (ver nota de diseño en RegistrarDenunciantePort, backend).
+  /// Devuelve [AuthResult] igual que [login] — autologueo tras registrar.
+  Future<AuthResult> registrarDenunciante({
+    required String nombre,
+    required String apellido,
+    required String documento,
+    required String telefono,
+    required String password,
+    required String confirmarPassword,
+  });
+
+  /// Registro de AGENTE mediante token de invitación generado por
+  /// Comando — espejo de `POST /auth/registro/agente`. El CAI NUNCA se
+  /// envía desde el cliente: sale del token, validado en el backend.
+  Future<AuthResult> registrarAgente({
+    required String token,
+    required String nombre,
+    required String telefono,
+    required String username,
+    required String password,
+    required String confirmarPassword,
+  });
 }
 
 class AuthService implements IAuthService {
@@ -54,5 +79,56 @@ class AuthService implements IAuthService {
       }
       rethrow;
     }
+  }
+
+  @override
+  Future<AuthResult> registrarDenunciante({
+    required String nombre,
+    required String apellido,
+    required String documento,
+    required String telefono,
+    required String password,
+    required String confirmarPassword,
+  }) async {
+    // NOTA: el backend modela "documento/username ya registrado" y
+    // "contraseñas no coinciden" como IllegalStateException -> 422
+    // (ver GlobalExceptionHandler + RegistrarDenuncianteService). ApiClient
+    // ya traduce ese 422 a ApiExceptionType.businessRule con e.message
+    // legible — no hace falta traducción extra acá, a diferencia de login.
+    final data = await _client.post(
+      '/auth/registro/denunciante',
+      data: {
+        'nombre': nombre,
+        'apellido': apellido,
+        'documento': documento,
+        'telefono': telefono,
+        'password': password,
+        'confirmarPassword': confirmarPassword,
+      },
+    );
+    return AuthResult.fromJson(data as Map<String, dynamic>);
+  }
+
+  @override
+  Future<AuthResult> registrarAgente({
+    required String token,
+    required String nombre,
+    required String telefono,
+    required String username,
+    required String password,
+    required String confirmarPassword,
+  }) async {
+    final data = await _client.post(
+      '/auth/registro/agente',
+      data: {
+        'token': token,
+        'nombre': nombre,
+        'telefono': telefono,
+        'username': username,
+        'password': password,
+        'confirmarPassword': confirmarPassword,
+      },
+    );
+    return AuthResult.fromJson(data as Map<String, dynamic>);
   }
 }

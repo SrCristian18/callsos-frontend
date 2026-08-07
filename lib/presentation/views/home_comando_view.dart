@@ -5,6 +5,9 @@ import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
 import '../../data/models/enums/estado_incidente.dart';
 import '../../data/models/incidente.dart';
+import '../../data/models/invitacion_agente.dart';
+import '../../data/services/api_exception.dart';
+import '../../data/services/cai_service.dart';
 import '../../data/services/incidente_service.dart';
 import '../viewmodels/incidente_list_viewmodel.dart';
 import '../viewmodels/sesion_viewmodel.dart';
@@ -50,6 +53,110 @@ class _HomeComandoViewState extends State<HomeComandoView>
     _tabs.dispose();
     _vm.dispose();
     super.dispose();
+  }
+
+  /// Diálogo para generar un token de invitación de agente.
+  ///
+  /// LIMITACIÓN CONOCIDA: no hay endpoint de "listar CAIs" en el backend
+  /// todavía (deuda_backend.md no lo contemplaba), así que Comando escribe
+  /// el ID del CAI a mano en vez de elegirlo de un selector. Si se agrega
+  /// ese endpoint más adelante, reemplazar este TextField por un
+  /// DropdownButton poblado desde él.
+  Future<void> _mostrarGenerarInvitacion(BuildContext context) async {
+    final caiService = context.read<ICaiService>();
+    final caiIdController = TextEditingController();
+    InvitacionAgente? invitacionGenerada;
+    String? error;
+    bool cargando = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Generar invitación de agente'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (invitacionGenerada == null) ...[
+                const Text(
+                  'Escribe el ID del CAI al que quedará asignado el '
+                  'agente. El token dura 48 horas y es de un solo uso.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: caiIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'ID del CAI',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(error!, style: const TextStyle(color: Colors.red)),
+                ],
+              ] else ...[
+                const Text('Comparte este token con el agente '
+                    '(verbalmente o por un canal interno):'),
+                const SizedBox(height: 12),
+                SelectableText(
+                  invitacionGenerada!.token,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                      fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Expira: ${invitacionGenerada!.fechaExpiracion}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(invitacionGenerada == null ? 'Cancelar' : 'Cerrar'),
+            ),
+            if (invitacionGenerada == null)
+              ElevatedButton(
+                onPressed: cargando
+                    ? null
+                    : () async {
+                        if (caiIdController.text.trim().isEmpty) return;
+                        setDialogState(() {
+                          cargando = true;
+                          error = null;
+                        });
+                        try {
+                          final invitacion = await caiService
+                              .generarInvitacion(caiIdController.text.trim());
+                          setDialogState(() {
+                            invitacionGenerada = invitacion;
+                            cargando = false;
+                          });
+                        } on ApiException catch (e) {
+                          setDialogState(() {
+                            error = e.message;
+                            cargando = false;
+                          });
+                        }
+                      },
+                child: cargando
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Generar'),
+              ),
+          ],
+        ),
+      ),
+    );
+
+    caiIdController.dispose();
   }
 
   Future<void> _mostrarDerivacion(
@@ -100,6 +207,11 @@ class _HomeComandoViewState extends State<HomeComandoView>
             ],
           ),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.vpn_key_outlined, color: Colors.white),
+              tooltip: 'Generar invitación de agente',
+              onPressed: () => _mostrarGenerarInvitacion(context),
+            ),
             IconButton(
               icon: const Icon(Icons.logout, color: Colors.white),
               onPressed: () async {
