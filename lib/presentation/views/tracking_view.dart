@@ -38,6 +38,13 @@ class _TrackingViewState extends State<TrackingView> {
   final MapController _mapController = MapController();
 
   Incidente? _incidente;
+  String? _incidenteId; // se guarda aparte de _incidente para poder
+  // reintentar la carga aunque _incidente nunca haya llegado a asignarse
+  // (fix Épica 5: antes el guard de "Reintentar" dependía de _incidente,
+  // que solo se setea en el camino EXITOSO — si la carga inicial fallaba,
+  // _incidente quedaba null para siempre y el botón "Reintentar" quedaba
+  // muerto: pasaba a mostrar el spinner y ahí se quedaba, sin volver a
+  // llamar _inicializar()).
   bool _cargandoIncidente = true;
   String? _errorCarga;
   bool _inicializado = false; // guard: didChangeDependencies puede llamarse N veces
@@ -62,6 +69,7 @@ class _TrackingViewState extends State<TrackingView> {
     final incidenteId = args?['incidenteId'] as String? ?? '';
     if (incidenteId.isNotEmpty) {
       _inicializado = true;
+      _incidenteId = incidenteId;
       _inicializar(incidenteId);
     }
   }
@@ -184,8 +192,8 @@ class _TrackingViewState extends State<TrackingView> {
                     _cargandoIncidente = true;
                     _errorCarga = null;
                   });
-                  if (_incidente != null) {
-                    _inicializar(_incidente!.id);
+                  if (_incidenteId != null) {
+                    _inicializar(_incidenteId!);
                   }
                 },
               ),
