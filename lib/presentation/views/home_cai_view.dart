@@ -59,6 +59,17 @@ class _HomeCAIViewState extends State<HomeCAIView>
 
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
+      // FIX: sin esto, el bottom sheet queda limitado a una fracción fija
+      // y pequeña de la altura de pantalla, SIN scroll — si el contenido
+      // (encabezado + descripción + lista de agentes + aviso + botón) no
+      // entra ahí, Flutter hace overflow silencioso en producción (franjas
+      // amarillas/negras) y, en tests, lanza una excepción real que abortó
+      // los 5 tests de este archivo. isScrollControlled: true deja que el
+      // sheet crezca hasta el alto real de su contenido (hasta la pantalla
+      // completa si hiciera falta), y el SingleChildScrollView de abajo es
+      // la red de seguridad para cuando aun así no entre (teclado abierto,
+      // pantalla chica, lista de agentes larga).
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => _BottomSheetAsignarAgente(
@@ -239,7 +250,8 @@ class _BottomSheetAsignarAgenteState
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-      child: Column(
+      child: SingleChildScrollView(
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -360,6 +372,7 @@ class _BottomSheetAsignarAgenteState
             ),
           ),
         ],
+        ),
       ),
     );
   }

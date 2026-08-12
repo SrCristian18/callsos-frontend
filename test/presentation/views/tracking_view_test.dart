@@ -142,17 +142,42 @@ void main() {
   });
 
   testWidgets(
-      'BUG DETECTADO: tras un fallo de carga, "Reintentar" NO vuelve a llamar '
-      'consultar() — se queda en spinner infinito sin ninguna llamada de red',
+      'FIX VERIFICADO: "Reintentar" vuelve a llamar consultar() con el mismo '
+      'incidenteId y, si vuelve a fallar, muestra el error de nuevo (no spinner infinito)',
       (tester) async {
-    // _inicializar() solo asigna _incidente dentro del try exitoso (línea
-    // ~76 de tracking_view.dart) — en la rama catch, _incidente queda
-    // null. El botón "Reintentar" solo reintenta si `_incidente != null`
-    // (línea ~187), guard que nunca se cumple después de un fallo
-    // inicial. Este test documenta el comportamiento ACTUAL (buggy), no
-    // el deseado — el fix correcto sería reintentar con el
-    // `incidenteId` original (guardado en un campo de estado), no
-    // depender de que `_incidente` ya se haya cargado con éxito antes.
+    // Antes del fix, _inicializar() solo asignaba _incidente dentro del
+    // try exitoso (línea ~76 de tracking_view.dart) — en la rama catch,
+    // _incidente quedaba null, y el guard de "Reintentar" (`_incidente
+    // != null`) nunca se cumplía tras un fallo inicial: el usuario
+    // quedaba con el spinner para siempre, sin ninguna llamada de red
+    // nueva. El fix guarda el incidenteId original en `_incidenteId`
+    // (set en didChangeDependencies, independiente de si consultar()
+    // tuvo éxito) y usa ESE campo para reintentar.
+    when(() => incidenteService.consultar('i-001'))
+        .thenThrow(Exception('Sin conexión'));
+
+    await tester.pumpWidget(appDePrueba());
+    await tester.pumpAndSettle();
+
+    verify(() => incidenteService.consultar('i-001')).called(1);
+
+    await tester.tap(find.text('Reintentar'));
+    await tester.pumpAndSettle();
+
+    // Debe haber una SEGUNDA llamada real — el corazón del fix.
+    verify(() => incidenteService.consultar('i-001')).called(1);
+
+    // El mock sigue fallando, así que debe volver a mostrar el error
+    // (no quedarse pegado en el spinner) — prueba que el ciclo completo
+    // carga -> error -> reintentar -> carga -> error es sano y repetible.
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('No se pudo cargar el incidente.'), findsOneWidget);
+    expect(find.text('Reintentar'), findsOneWidget);
+  });
+
+  testWidgets(
+      'se puede reintentar más de una vez seguida sin quedar en un estado inconsistente',
+      (tester) async {
     when(() => incidenteService.consultar('i-001'))
         .thenThrow(Exception('Sin conexión'));
 
@@ -160,12 +185,12 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Reintentar'));
-    await tester.pump();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Reintentar'));
+    await tester.pumpAndSettle();
 
-    // Se queda mostrando el spinner para siempre — nunca vuelve a
-    // renderizar el mensaje de error ni el botón, porque _inicializar()
-    // nunca vuelve a ejecutarse.
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    verify(() => incidenteService.consultar('i-001')).called(1); // NO 2 — este es el bug
+    // 1 carga inicial + 2 reintentos = 3 llamadas totales.
+    verify(() => incidenteService.consultar('i-001')).called(3);
+    expect(find.text('Reintentar'), findsOneWidget);
   });
 }
