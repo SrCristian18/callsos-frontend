@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:provider/provider.dart';
 
 import 'package:CallSos/core/app_routes.dart';
+import 'package:CallSos/core/route_guard.dart';
+import 'package:CallSos/data/models/auth_result.dart';
+import 'package:CallSos/data/models/enums/rol.dart';
+import 'package:CallSos/data/services/auth_service.dart';
+import 'package:CallSos/data/services/secure_storage.dart';
+import 'package:CallSos/presentation/viewmodels/sesion_viewmodel.dart';
 import 'package:CallSos/presentation/views/splash_view.dart';
 import 'package:CallSos/presentation/views/role_selection_view.dart';
 import 'package:CallSos/presentation/views/welcome_view.dart';
@@ -20,24 +28,38 @@ import 'package:CallSos/presentation/views/reporte_hallazgos_view.dart';
 
 /// Épica 5 (ruta técnica) — "Test de navegación (AppRoutes + Navigator)".
 ///
-/// GAP DETECTADO (documentado a propósito, no un olvido): la ruta técnica
-/// pide probar "guards de rutas por rol", pero revisando el código no
-/// existe tal mecanismo — `AppRoutes.routes` es un mapa plano sin ningún
-/// middleware que verifique el rol antes de construir la vista destino.
-/// Lo que sí existe es lógica condicional DENTRO de vistas compartidas
-/// (p. ej. `DetalleIncidenteView` muestra botones distintos según
-/// `sesion.rol`), pero eso no es un guard de navegación: nada impide que,
-/// por ejemplo, un DENUNCIANTE autenticado ejecute
-/// `Navigator.pushNamed(context, AppRoutes.homeAgente)` y la vista se
-/// construya igual. El test de abajo (`ningunGuardDeRolExisteHoy`) deja
-/// esto verificado explícitamente, en vez de simularlo como si existiera.
+/// ACTUALIZACIÓN: este archivo documentaba antes la AUSENCIA de guards de
+/// rol como un gap intencional. Esa decisión se revirtió — se implementó
+/// [RouteGuard] (ver `core/route_guard.dart`) y `AppRoutes.routes` ahora
+/// envuelve las 4 Homes y el flujo de incidente con él. Este archivo
+/// prueba el contrato actual: qué vista construye cada ruta (directa o a
+/// través de un guard) y el comportamiento real del guard ante sesión
+/// ausente / rol incorrecto / rol correcto.
+
+class MockAuthService extends Mock implements IAuthService {}
+
+class FakeSecureStorage implements ISecureStorage {
+  final Map<String, String> _datos = {};
+  @override
+  Future<String?> read(String key) async => _datos[key];
+  @override
+  Future<void> write(String key, String value) async => _datos[key] = value;
+  @override
+  Future<void> delete(String key) async => _datos.remove(key);
+}
+
+Future<SesionViewModel> _sesionSinSesionPrevia(MockAuthService authService) async {
+  final sesion = SesionViewModel(authService: authService, storage: FakeSecureStorage());
+  await sesion.restaurarSesion();
+  return sesion;
+}
+
 void main() {
   group('AppRoutes.routes — contrato del mapa de navegación', () {
     late BuildContext context;
 
-    setUp(() {});
-
-    testWidgets('cada ruta declarada construye el tipo de vista correcto', (tester) async {
+    testWidgets('cada ruta declarada construye el tipo de vista correcto '
+        '(directo, o RouteGuard envolviendo la vista real)', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Builder(builder: (ctx) {
@@ -47,7 +69,8 @@ void main() {
         ),
       );
 
-      final esperado = <String, Type>{
+      // Rutas sin guard: construyen la vista directamente.
+      final sinGuard = <String, Type>{
         AppRoutes.splash: SplashView,
         AppRoutes.roleSelection: RoleSelectionView,
         AppRoutes.welcome: WelcomeView,
@@ -56,25 +79,53 @@ void main() {
         AppRoutes.registerDenunciante: RegisterDenuncianteView,
         AppRoutes.registerPolicia: RegisterPoliciaView,
         AppRoutes.forgotPassword: ForgotPasswordView,
-        AppRoutes.homeDenunciante: HomeDenuncianteView,
-        AppRoutes.homeAgente: HomeAgenteView,
-        AppRoutes.homeCai: HomeCAIView,
-        AppRoutes.homeComando: HomeComandoView,
-        AppRoutes.detalleIncidente: DetalleIncidenteView,
-        AppRoutes.tracking: TrackingView,
-        AppRoutes.reporteHallazgos: ReporteHallazgosView,
+      };
+
+      // Rutas con guard: el WidgetBuilder construye un RouteGuard cuyo
+      // `child` es la vista real, con el set de roles esperado.
+      final conGuard = <String, (Type, Set<Rol>)>{
+        AppRoutes.homeDenunciante: (HomeDenuncianteView, {Rol.DENUNCIANTE}),
+        AppRoutes.homeAgente: (HomeAgenteView, {Rol.AGENTE}),
+        AppRoutes.homeCai: (HomeCAIView, {Rol.OPERADOR_CAI}),
+        AppRoutes.homeComando: (HomeComandoView, {Rol.COMANDO}),
+        AppRoutes.detalleIncidente: (
+          DetalleIncidenteView,
+          {Rol.DENUNCIANTE, Rol.AGENTE, Rol.OPERADOR_CAI, Rol.COMANDO}
+        ),
+        AppRoutes.tracking: (
+          TrackingView,
+          {Rol.DENUNCIANTE, Rol.AGENTE, Rol.OPERADOR_CAI, Rol.COMANDO}
+        ),
+        AppRoutes.reporteHallazgos: (
+          ReporteHallazgosView,
+          {Rol.DENUNCIANTE, Rol.AGENTE, Rol.OPERADOR_CAI, Rol.COMANDO}
+        ),
       };
 
       final routes = AppRoutes.routes;
 
-      expect(routes.keys.toSet(), esperado.keys.toSet(),
-          reason: 'El mapa de rutas no debe tener rutas de más o de menos '
-              'respecto a lo documentado en AppRoutes');
+      expect(
+        routes.keys.toSet(),
+        {...sinGuard.keys, ...conGuard.keys},
+        reason: 'El mapa de rutas no debe tener rutas de más o de menos '
+            'respecto a lo documentado en AppRoutes',
+      );
 
-      for (final entry in esperado.entries) {
+      for (final entry in sinGuard.entries) {
         final widget = routes[entry.key]!(context);
         expect(widget.runtimeType, entry.value,
             reason: 'La ruta "${entry.key}" no construye ${entry.value}');
+      }
+
+      for (final entry in conGuard.entries) {
+        final widget = routes[entry.key]!(context);
+        expect(widget, isA<RouteGuard>(),
+            reason: 'La ruta "${entry.key}" debe estar protegida por RouteGuard');
+        final guard = widget as RouteGuard;
+        expect(guard.child.runtimeType, entry.value.$1,
+            reason: 'El child del RouteGuard de "${entry.key}" no es ${entry.value.$1}');
+        expect(guard.rolesPermitidos, entry.value.$2,
+            reason: 'Los roles permitidos en "${entry.key}" no coinciden');
       }
     });
 
@@ -111,18 +162,96 @@ void main() {
       expect(AppRoutes.routes.containsKey('/incident_view'), isFalse);
       expect(AppRoutes.routes.containsKey('/report_view'), isFalse);
     });
+
+    test('rutaHomeDeRol cubre los 4 roles con la Home correcta', () {
+      expect(AppRoutes.rutaHomeDeRol(Rol.DENUNCIANTE), AppRoutes.homeDenunciante);
+      expect(AppRoutes.rutaHomeDeRol(Rol.AGENTE), AppRoutes.homeAgente);
+      expect(AppRoutes.rutaHomeDeRol(Rol.OPERADOR_CAI), AppRoutes.homeCai);
+      expect(AppRoutes.rutaHomeDeRol(Rol.COMANDO), AppRoutes.homeComando);
+    });
   });
 
-  group('Guards de rutas por rol — verificación de la ausencia documentada arriba', () {
-    test('ningún guard de rol existe hoy: AppRoutes.routes es un mapa plano '
-        'de String a WidgetBuilder, sin envoltorio de autorización', () {
-      // Prueba estructural: cada valor del mapa es literalmente un
-      // WidgetBuilder puro. Si en el futuro se agrega un guard (p. ej. un
-      // RoleGuard que envuelva al builder), este test debe actualizarse
-      // para reflejar el nuevo contrato — hasta entonces, confirma que
-      // cualquier código autenticado con cualquier rol puede alcanzar
-      // cualquier ruta con Navigator.pushNamed, sin importar el rol.
-      expect(AppRoutes.routes.values, everyElement(isA<WidgetBuilder>()));
+  group('RouteGuard — comportamiento real de los guards de rol', () {
+    Widget appDePrueba(SesionViewModel sesion, RouteGuard guard) {
+      return ChangeNotifierProvider<SesionViewModel>.value(
+        value: sesion,
+        child: MaterialApp(
+          home: guard,
+          routes: {
+            AppRoutes.roleSelection: (_) => const Scaffold(body: Text('role_selection')),
+            AppRoutes.homeDenunciante: (_) => const Scaffold(body: Text('home_denunciante')),
+            AppRoutes.homeAgente: (_) => const Scaffold(body: Text('home_agente')),
+          },
+        ),
+      );
+    }
+
+    testWidgets('sin sesión autenticada, redirige a roleSelection y NO muestra el child',
+        (tester) async {
+      final sesion = await _sesionSinSesionPrevia(MockAuthService());
+
+      await tester.pumpWidget(appDePrueba(
+        sesion,
+        const RouteGuard(
+          rolesPermitidos: {Rol.DENUNCIANTE},
+          child: Text('CONTENIDO_PROTEGIDO'),
+        ),
+      ));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('CONTENIDO_PROTEGIDO'), findsNothing);
+      expect(find.text('role_selection'), findsOneWidget);
+    });
+
+    testWidgets('autenticado con rol NO permitido, redirige a la Home real de su rol',
+        (tester) async {
+      final authService = MockAuthService();
+      when(() => authService.login(username: 'den-001', password: '1234')).thenAnswer(
+        (_) async => const AuthResult(
+            token: 'jwt-den', actorId: 'den-001', rol: Rol.DENUNCIANTE),
+      );
+      final sesion = await _sesionSinSesionPrevia(authService);
+      await sesion.login(username: 'den-001', password: '1234');
+
+      // Guard de /home_agente — un DENUNCIANTE no debería poder verla.
+      await tester.pumpWidget(appDePrueba(
+        sesion,
+        const RouteGuard(
+          rolesPermitidos: {Rol.AGENTE},
+          child: Text('CONTENIDO_DE_AGENTE'),
+        ),
+      ));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('CONTENIDO_DE_AGENTE'), findsNothing);
+      // Redirige a SU home (denunciante), no a roleSelection ni a un error.
+      expect(find.text('home_denunciante'), findsOneWidget);
+    });
+
+    testWidgets('autenticado con rol permitido, muestra el child sin redirigir',
+        (tester) async {
+      final authService = MockAuthService();
+      when(() => authService.login(username: 'den-001', password: '1234')).thenAnswer(
+        (_) async => const AuthResult(
+            token: 'jwt-den', actorId: 'den-001', rol: Rol.DENUNCIANTE),
+      );
+      final sesion = await _sesionSinSesionPrevia(authService);
+      await sesion.login(username: 'den-001', password: '1234');
+
+      await tester.pumpWidget(appDePrueba(
+        sesion,
+        const RouteGuard(
+          rolesPermitidos: {Rol.DENUNCIANTE},
+          child: Text('CONTENIDO_PROTEGIDO'),
+        ),
+      ));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('CONTENIDO_PROTEGIDO'), findsOneWidget);
+      expect(find.text('role_selection'), findsNothing);
     });
   });
 }

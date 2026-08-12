@@ -112,11 +112,30 @@ abstract class IStompService {
 class StompService implements IStompService {
   final ITokenProvider? tokenProvider;
 
+  /// Fábrica del `StompClient` real — inyectable para tests.
+  ///
+  /// Épica 5 — Testing frontend / StompService: antes, `conectar()`
+  /// instanciaba `StompClient(...)` directamente, sin ningún punto de
+  /// inyección — imposible de testear sin una conexión WebSocket real.
+  /// Por defecto usa el constructor real (`StompClient.new`); en tests
+  /// se sustituye por una que devuelve un mock, lo que permite capturar
+  /// el [StompConfig] pasado y simular manualmente los callbacks de
+  /// ciclo de vida (`onConnect`, `onStompError`, `onWebSocketError`,
+  /// `onDisconnect`) sin abrir un socket de verdad — eso es lo que
+  /// prueba el "contrato de reconexión/errores": que StompService
+  /// interprete y propague correctamente esos eventos (el reintento
+  /// automático en sí, basado en Timer, vive dentro de StompClient/el
+  /// paquete `stomp_dart_client`, no en este código).
+  final StompClient Function({required StompConfig config}) _creadorCliente;
+
   StompClient? _client;
   StompUnsubscribe? _suscripcionActual;
   bool _conectado = false;
 
-  StompService({this.tokenProvider});
+  StompService({
+    this.tokenProvider,
+    StompClient Function({required StompConfig config})? creadorCliente,
+  }) : _creadorCliente = creadorCliente ?? StompClient.new;
 
   @override
   bool get estaConectado => _conectado;
@@ -133,7 +152,7 @@ class StompService implements IStompService {
       if (token != null) 'Authorization': 'Bearer $token',
     };
 
-    _client = StompClient(
+    _client = _creadorCliente(
       config: StompConfig(
         url: AppConfig.wsBaseUrl,
         stompConnectHeaders: stompHeaders,
