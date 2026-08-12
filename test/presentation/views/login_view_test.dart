@@ -28,9 +28,16 @@ void main() {
   late MockAuthService authService;
   late SesionViewModel sesion;
 
-  setUp(() {
+  setUp(() async {
     authService = MockAuthService();
     sesion = SesionViewModel(authService: authService, storage: FakeSecureStorage());
+    // FIX: SesionViewModel arranca con isLoading == true hasta que
+    // restaurarSesion() termina (así lo hace AppProviders en la app real
+    // antes de mostrar cualquier vista). Sin este await, isLoading queda
+    // en true para siempre y LoginView solo renderiza el
+    // CircularProgressIndicator — el botón "Iniciar sesión" nunca existe
+    // y todos los find.text/tap sobre él fallan con "Found 0 widgets".
+    await sesion.restaurarSesion();
   });
 
   Widget appDePrueba() {
