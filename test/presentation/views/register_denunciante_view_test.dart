@@ -28,9 +28,14 @@ void main() {
   late MockAuthService authService;
   late SesionViewModel sesion;
 
-  setUp(() {
+  setUp(() async {
     authService = MockAuthService();
     sesion = SesionViewModel(authService: authService, storage: FakeSecureStorage());
+    // FIX: ver login_view_test.dart — sin este await, isLoading queda en
+    // true para siempre y RegisterDenuncianteView nunca renderiza el
+    // botón "Registrar" (solo el spinner), por lo que el tap() falla con
+    // "Found 0 widgets with text ...".
+    await sesion.restaurarSesion();
   });
 
   Widget appDePrueba() {
@@ -56,6 +61,24 @@ void main() {
     await tester.enterText(campos.at(5), 'Password123');
   }
 
+  // FIX: el formulario tiene 6 campos + ícono + título + subtítulo dentro
+  // de un SingleChildScrollView raíz, y no cabe en el viewport de test
+  // (800x600 por defecto). El botón "Registrar" SÍ se encuentra (el
+  // finder lo localiza en el árbol), pero su offset real queda fuera de
+  // Size(800,600) — "Offset(400.0, 735.0) is outside the bounds of the
+  // root of the render tree". tester.tap() ahí no falla (solo emite un
+  // warning no fatal) pero el toque no llega a ningún lado: el botón
+  // nunca se presiona de verdad, así que authService nunca se llama y
+  // los tests que esperan éxito/error tras "Registrar" fallan por
+  // ausencia de esos textos. tester.ensureVisible() hace scroll dentro
+  // del SingleChildScrollView hasta que el botón quede en pantalla.
+  Future<void> tocarRegistrar(WidgetTester tester) async {
+    final boton = find.text('Registrar');
+    await tester.ensureVisible(boton);
+    await tester.pumpAndSettle();
+    await tester.tap(boton);
+  }
+
   testWidgets('renderiza los 6 campos del formulario', (tester) async {
     await tester.pumpWidget(appDePrueba());
     expect(find.byType(TextField), findsNWidgets(6));
@@ -65,7 +88,7 @@ void main() {
     await tester.pumpWidget(appDePrueba());
 
     await tester.enterText(find.byType(TextField).at(0), 'Ana'); // solo el primero
-    await tester.tap(find.text('Registrar'));
+    await tocarRegistrar(tester);
     await tester.pumpAndSettle();
 
     verifyNever(() => authService.registrarDenunciante(
@@ -92,7 +115,7 @@ void main() {
 
     await tester.pumpWidget(appDePrueba());
     await llenarFormulario(tester);
-    await tester.tap(find.text('Registrar'));
+    await tocarRegistrar(tester);
     await tester.pumpAndSettle();
 
     expect(find.text('home_denunciante'), findsOneWidget);
@@ -113,7 +136,7 @@ void main() {
 
     await tester.pumpWidget(appDePrueba());
     await llenarFormulario(tester);
-    await tester.tap(find.text('Registrar'));
+    await tocarRegistrar(tester);
     await tester.pumpAndSettle();
 
     expect(find.text('El documento ya está registrado.'), findsOneWidget);

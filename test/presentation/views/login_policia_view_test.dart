@@ -28,9 +28,14 @@ void main() {
   late MockAuthService authService;
   late SesionViewModel sesion;
 
-  setUp(() {
+  setUp(() async {
     authService = MockAuthService();
     sesion = SesionViewModel(authService: authService, storage: FakeSecureStorage());
+    // FIX: ver login_view_test.dart — sin este await, isLoading queda en
+    // true para siempre y LoginPoliciaView nunca renderiza el botón
+    // "Iniciar sesión" (solo el spinner), por lo que el tap() falla con
+    // "Found 0 widgets with text ...".
+    await sesion.restaurarSesion();
   });
 
   Widget appDePrueba() {
