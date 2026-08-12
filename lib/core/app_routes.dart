@@ -15,6 +15,8 @@ import 'package:CallSos/presentation/views/home_comando_view.dart';
 import 'package:CallSos/presentation/views/detalle_incidente_view.dart';
 import 'package:CallSos/presentation/views/tracking_view.dart';
 import 'package:CallSos/presentation/views/reporte_hallazgos_view.dart';
+import 'package:CallSos/data/models/enums/rol.dart';
+import 'route_guard.dart';
 
 /// Mapa de navegación completo de CallSOS.
 ///
@@ -63,6 +65,34 @@ class AppRoutes {
   static const String tracking          = '/tracking';
   static const String reporteHallazgos  = '/reporte_hallazgos';
 
+  /// Home correspondiente a cada rol autenticado — usada por [SplashView]
+  /// (destino tras restaurar sesión) y por [RouteGuard] (destino de
+  /// redirección cuando el rol de la sesión no tiene acceso a la ruta
+  /// pedida).
+  static String rutaHomeDeRol(Rol rol) {
+    switch (rol) {
+      case Rol.DENUNCIANTE:
+        return homeDenunciante;
+      case Rol.AGENTE:
+        return homeAgente;
+      case Rol.OPERADOR_CAI:
+        return homeCai;
+      case Rol.COMANDO:
+        return homeComando;
+    }
+  }
+
+  /// Épica 5 — Testing frontend / Navegación: cualquier rol autenticado
+  /// puede ver detalle/tracking/reporte de un incidente (denunciante,
+  /// agente, CAI o comando) — lo que [RouteGuard] exige ahí es solo que
+  /// HAYA sesión, no un rol específico.
+  static const Set<Rol> _cualquierRolAutenticado = {
+    Rol.DENUNCIANTE,
+    Rol.AGENTE,
+    Rol.OPERADOR_CAI,
+    Rol.COMANDO,
+  };
+
   static Map<String, WidgetBuilder> get routes => {
     // Splash
     splash:               (_) => const SplashView(),
@@ -76,15 +106,36 @@ class AppRoutes {
     registerPolicia:      (_) => const RegisterPoliciaView(),
     forgotPassword:       (_) => const ForgotPasswordView(),
 
-    // Homes
-    homeDenunciante:      (_) => const HomeDenuncianteView(),
-    homeAgente:           (_) => const HomeAgenteView(),
-    homeCai:              (_) => const HomeCAIView(),
-    homeComando:          (_) => const HomeComandoView(),
+    // Homes — cada una exige el rol correspondiente (F.5, guards de rol).
+    homeDenunciante:      (_) => const RouteGuard(
+                                    rolesPermitidos: {Rol.DENUNCIANTE},
+                                    child: HomeDenuncianteView(),
+                                  ),
+    homeAgente:           (_) => const RouteGuard(
+                                    rolesPermitidos: {Rol.AGENTE},
+                                    child: HomeAgenteView(),
+                                  ),
+    homeCai:              (_) => const RouteGuard(
+                                    rolesPermitidos: {Rol.OPERADOR_CAI},
+                                    child: HomeCAIView(),
+                                  ),
+    homeComando:          (_) => const RouteGuard(
+                                    rolesPermitidos: {Rol.COMANDO},
+                                    child: HomeComandoView(),
+                                  ),
 
-    // Flujo incidente
-    detalleIncidente:     (_) => const DetalleIncidenteView(),
-    tracking:             (_) => const TrackingView(),
-    reporteHallazgos:     (_) => const ReporteHallazgosView(),
+    // Flujo incidente — cualquier rol autenticado.
+    detalleIncidente:     (_) => const RouteGuard(
+                                    rolesPermitidos: _cualquierRolAutenticado,
+                                    child: DetalleIncidenteView(),
+                                  ),
+    tracking:             (_) => const RouteGuard(
+                                    rolesPermitidos: _cualquierRolAutenticado,
+                                    child: TrackingView(),
+                                  ),
+    reporteHallazgos:     (_) => const RouteGuard(
+                                    rolesPermitidos: _cualquierRolAutenticado,
+                                    child: ReporteHallazgosView(),
+                                  ),
   };
 }

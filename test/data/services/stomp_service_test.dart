@@ -1,27 +1,26 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:stomp_dart_client/stomp_dart_client.dart';
+
 import 'package:CallSos/data/services/stomp_service.dart';
+import 'package:CallSos/data/services/token_provider.dart';
 
 /// Épica 5 (ruta técnica) — "Test de StompService (contrato de
 /// reconexión/errores)".
 ///
-/// LIMITACIÓN ARQUITECTÓNICA (documentada a propósito, no un olvido):
-/// `StompService._client` es un `StompClient` (paquete `stomp_dart_client`)
-/// construido DENTRO de `conectar()` — no hay ningún punto de inyección
-/// para reemplazarlo por un doble de prueba desde afuera. Por lo tanto,
-/// el ciclo real de conexión/reconexión/heartbeat solo puede probarse
-/// hoy con un servidor WebSocket real (fuera del alcance de un test
-/// unitario). Si en el futuro se necesita cubrir eso, la vía es
-/// refactorizar `StompService` para aceptar una factory inyectable
-/// `StompClient Function(StompConfig)` — no se hace aquí para no
-/// modificar comportamiento de producción sin que el equipo lo pida.
+/// ACTUALIZACIÓN: este archivo documentaba antes la imposibilidad de
+/// testear el ciclo de conexión real por falta de un punto de inyección
+/// en `StompService`. Esa decisión se revirtió — `StompService` ahora
+/// acepta una factory inyectable `creadorCliente` (ver
+/// `data/services/stomp_service.dart`), y el segundo grupo de tests de
+/// abajo la usa para capturar el `StompConfig` real y simular
+/// manualmente los callbacks que `StompClient` invocaría al recibir
+/// eventos del servidor — sin abrir un WebSocket real.
 ///
-/// Lo que SÍ se prueba, sin red, y es exactamente lo que un "contrato de
-/// errores" debe garantizar para no tumbar la UI de tracking:
-///   1. `UbicacionMensaje.fromJson` — el parseo del payload STOMP.
-///   2. Que el servicio sea seguro de llamar en CUALQUIER orden — en
-///      particular, ANTES de `conectar()` (caso real: el usuario navega
-///      fuera de `TrackingView` antes de que la conexión termine de
-///      establecerse) — sin lanzar excepciones.
+/// El primer grupo (parseo + "seguro de llamar en cualquier orden") se
+/// mantiene igual que antes — sigue siendo válido y valioso.
 void main() {
   group('UbicacionMensaje.fromJson', () {
     test('parsea un payload válido completo', () {
@@ -133,4 +132,222 @@ void main() {
       expect(service.estaConectado, isFalse);
     });
   });
+
+  group('StompService — contrato de reconexión/errores (StompClient inyectado)', () {
+    // Con la factory inyectable (`creadorCliente`) se captura el
+    // StompConfig real que StompService arma y se simulan manualmente
+    // los callbacks que StompClient invocaría al recibir eventos del
+    // servidor (onConnect/onStompError/onWebSocketError/onDisconnect) —
+    // sin abrir un WebSocket real. El reintento automático en sí
+    // (Timer interno de StompClient tras `onWebSocketDone`) es
+    // responsabilidad del paquete `stomp_dart_client`, no de este
+    // código; lo que SÍ es responsabilidad de StompService — y lo que
+    // este grupo prueba — es que interprete y propague correctamente
+    // cada evento de ciclo de vida hacia `estaConectado` y los
+    // callbacks `onConnected`/`onError` que le pasa quien lo usa
+    // (TrackingViewModel).
+    late MockStompClient mockClient;
+    late StompConfig configCapturada;
+
+    StompService crearServicio({FakeTokenProvider? tokenProvider}) {
+      return StompService(
+        tokenProvider: tokenProvider,
+        creadorCliente: ({required StompConfig config}) {
+          configCapturada = config;
+          mockClient = MockStompClient();
+          when(() => mockClient.activate()).thenReturn(null);
+          when(() => mockClient.deactivate()).thenReturn(null);
+          return mockClient;
+        },
+      );
+    }
+
+    test('conectar() arma el StompConfig con reconnectDelay de 5s y heartbeats de 10s',
+        () async {
+      final service = crearServicio();
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+
+      expect(configCapturada.reconnectDelay, const Duration(seconds: 5));
+      expect(configCapturada.heartbeatOutgoing, const Duration(seconds: 10));
+      expect(configCapturada.heartbeatIncoming, const Duration(seconds: 10));
+      verify(() => mockClient.activate()).called(1);
+    });
+
+    test('conectar() con tokenProvider agrega Authorization: Bearer <token> '
+        'a los headers STOMP y WebSocket', () async {
+      final service = crearServicio(tokenProvider: FakeTokenProvider('jwt-track'));
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+
+      expect(configCapturada.stompConnectHeaders, {'Authorization': 'Bearer jwt-track'});
+      expect(configCapturada.webSocketConnectHeaders, {'Authorization': 'Bearer jwt-track'});
+    });
+
+    test('conectar() sin tokenProvider (o con token null) NO agrega header Authorization',
+        () async {
+      final service = crearServicio(tokenProvider: FakeTokenProvider(null));
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+
+      expect(configCapturada.stompConnectHeaders, isEmpty);
+      expect(configCapturada.webSocketConnectHeaders, isEmpty);
+    });
+
+    test('onConnect del StompClient marca estaConectado=true y llama onConnected',
+        () async {
+      final service = crearServicio();
+      var seLlamoOnConnected = false;
+
+      await service.conectar(
+        onConnected: () => seLlamoOnConnected = true,
+        onError: (_) {},
+      );
+      expect(service.estaConectado, isFalse); // aún no "conectó" el server
+
+      // Simula lo que StompClient haría al recibir el frame CONNECTED.
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+
+      expect(service.estaConectado, isTrue);
+      expect(seLlamoOnConnected, isTrue);
+    });
+
+    test('onStompError marca estaConectado=false y propaga frame.body como mensaje',
+        () async {
+      final service = crearServicio();
+      String? errorRecibido;
+
+      await service.conectar(onConnected: () {}, onError: (e) => errorRecibido = e);
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED')); // estaba conectado
+      expect(service.estaConectado, isTrue);
+
+      configCapturada.onStompError(
+        StompFrame(command: 'ERROR', body: 'Transición de estado inválida'),
+      );
+
+      expect(service.estaConectado, isFalse);
+      expect(errorRecibido, 'Transición de estado inválida');
+    });
+
+    test('onStompError con frame.body null usa el mensaje genérico de fallback', () async {
+      final service = crearServicio();
+      String? errorRecibido;
+
+      await service.conectar(onConnected: () {}, onError: (e) => errorRecibido = e);
+      configCapturada.onStompError(StompFrame(command: 'ERROR'));
+
+      expect(errorRecibido, 'Error STOMP desconocido');
+    });
+
+    test('onWebSocketError marca estaConectado=false y propaga el error con prefijo',
+        () async {
+      final service = crearServicio();
+      String? errorRecibido;
+
+      await service.conectar(onConnected: () {}, onError: (e) => errorRecibido = e);
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+
+      configCapturada.onWebSocketError('Connection refused');
+
+      expect(service.estaConectado, isFalse);
+      expect(errorRecibido, 'Error WebSocket: Connection refused');
+    });
+
+    test('onDisconnect marca estaConectado=false (sin invocar onError — '
+        'es un cierre normal, no un error)', () async {
+      final service = crearServicio();
+      var seLlamoOnError = false;
+
+      await service.conectar(onConnected: () {}, onError: (_) => seLlamoOnError = true);
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+      expect(service.estaConectado, isTrue);
+
+      configCapturada.onDisconnect(StompFrame(command: 'DISCONNECT'));
+
+      expect(service.estaConectado, isFalse);
+      expect(seLlamoOnError, isFalse);
+    });
+
+    test('llamar conectar() dos veces mientras ya está conectado no crea un segundo cliente',
+        () async {
+      final service = crearServicio();
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+      final primerCliente = mockClient;
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+
+      // La factory no se volvió a invocar — mockClient sigue siendo el
+      // mismo objeto capturado en la primera llamada.
+      expect(mockClient, same(primerCliente));
+      verify(() => mockClient.activate()).called(1); // no 2
+    });
+
+    test('enviarUbicacion mientras conectado delega en el cliente con destino y body correctos',
+        () async {
+      final service = crearServicio();
+      when(() => mockClient.send(
+            destination: any(named: 'destination'),
+            body: any(named: 'body'),
+          )).thenReturn(null);
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+
+      service.enviarUbicacion(
+        incidenteId: 'i-001',
+        agenteId: 'ag-001',
+        latitud: 10.4,
+        longitud: -75.5,
+      );
+
+      final captura = verify(() => mockClient.send(
+            destination: captureAny(named: 'destination'),
+            body: captureAny(named: 'body'),
+          )).captured;
+      expect(captura[0], '/app/ubicacion/i-001');
+      final body = jsonDecode(captura[1] as String) as Map<String, dynamic>;
+      expect(body, {'agenteId': 'ag-001', 'latitud': 10.4, 'longitud': -75.5});
+    });
+
+    test('enviarUbicacion mientras NO conectado no llama al cliente (no-op real, '
+        'no solo "no lanza excepción")', () async {
+      final service = crearServicio();
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      // OJO: nunca se simuló onConnect — sigue desconectado.
+
+      service.enviarUbicacion(
+        incidenteId: 'i-001',
+        agenteId: 'ag-001',
+        latitud: 10.4,
+        longitud: -75.5,
+      );
+
+      verifyNever(() => mockClient.send(
+            destination: any(named: 'destination'),
+            body: any(named: 'body'),
+          ));
+    });
+
+    test('desconectar() llama deactivate() en el cliente real y limpia el estado',
+        () async {
+      final service = crearServicio();
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+      expect(service.estaConectado, isTrue);
+
+      await service.desconectar();
+
+      verify(() => mockClient.deactivate()).called(1);
+      expect(service.estaConectado, isFalse);
+    });
+  });
+}
+
+class MockStompClient extends Mock implements StompClient {}
+
+class FakeTokenProvider implements ITokenProvider {
+  FakeTokenProvider(this.token);
+  @override
+  final String? token;
 }

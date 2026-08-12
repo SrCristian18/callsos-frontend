@@ -26,20 +26,6 @@ import '../viewmodels/sesion_viewmodel.dart';
 class SplashView extends StatelessWidget {
   const SplashView({super.key});
 
-  /// Home correspondiente al rol autenticado.
-  String _rutaPorRol(Rol rol) {
-    switch (rol) {
-      case Rol.DENUNCIANTE:
-        return AppRoutes.homeDenunciante;
-      case Rol.AGENTE:
-        return AppRoutes.homeAgente;
-      case Rol.OPERADOR_CAI:
-        return AppRoutes.homeCai;
-      case Rol.COMANDO:
-        return AppRoutes.homeComando;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Consumer<SesionViewModel>(
@@ -60,8 +46,10 @@ class SplashView extends StatelessWidget {
                   );
             }
 
+            // Home correspondiente al rol autenticado — mapeo
+            // compartido con RouteGuard (ver AppRoutes.rutaHomeDeRol).
             final destino = sesion.isAuthenticated
-                ? _rutaPorRol(sesion.rol!)
+                ? AppRoutes.rutaHomeDeRol(sesion.rol!)
                 : AppRoutes.roleSelection;
             Navigator.of(context).pushReplacementNamed(destino);
           });
