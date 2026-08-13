@@ -178,6 +178,29 @@ void main() {
       );
     });
 
+    // Regresión: DioExceptionType.transformTimeout (timeout al transformar
+    // la respuesta) no estaba cubierto explícitamente en el switch de
+    // ApiException.fromDioException — `flutter analyze` lo marcaba como
+    // error (non_exhaustive_switch_statement) porque el enum de dio tiene
+    // 9 valores, no 8. Va agrupado con los otros 3 timeouts: es el mismo
+    // tipo de problema (el servidor tardó demasiado), solo que ocurre
+    // durante el parseo de la respuesta en vez de la conexión/envío/
+    // recepción.
+    test('timeout de transformación de la respuesta también se traduce a tipo timeout',
+        () async {
+      adapter.nextError = DioException(
+        requestOptions: RequestOptions(path: '/incidentes'),
+        type: DioExceptionType.transformTimeout,
+      );
+      final client = ApiClient(dio: dio);
+
+      await expectLater(
+        client.get('/incidentes/i-001'),
+        throwsA(isA<ApiException>()
+            .having((e) => e.type, 'type', ApiExceptionType.timeout)),
+      );
+    });
+
     test('sin conexión se traduce a ApiException tipo noConnection', () async {
       adapter.nextError = DioException(
         requestOptions: RequestOptions(path: '/incidentes'),
