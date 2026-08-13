@@ -25,5 +25,24 @@ jobs:
       - name: Analizar código (lints)
         run: flutter analyze
 
-      - name: Ejecutar tests
-        run: flutter test
+      # Épica 7: --coverage genera coverage/lcov.info. main.dart lleva
+      # `// coverage:ignore-file` (bootstrap de Firebase/runApp, no
+      # testeable) para no castigar el % global con código no cubrible.
+      - name: Ejecutar tests con cobertura
+        run: flutter test --coverage
+
+      # Umbral mínimo de cobertura — falla el build si coverage/lcov.info
+      # reporta menos de min_coverage%. Acción estándar de la comunidad
+      # Flutter para esto (no hay equivalente nativo a jacoco:check).
+      - name: Verificar cobertura mínima
+        uses: VeryGoodOpenSource/very_good_coverage@v3
+        with:
+          path: coverage/lcov.info
+          min_coverage: 65
+
+      - name: Publicar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-lcov-frontend
+          path: coverage/lcov.info

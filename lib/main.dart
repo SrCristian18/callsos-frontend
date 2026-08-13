@@ -1,3 +1,8 @@
+// coverage:ignore-file
+// Épica 7: excluido de la medición de cobertura — es bootstrap de la app
+// (Firebase.initializeApp(), runApp()), no lógica de negocio testeable
+// con flutter test. Sin esto, este archivo queda siempre en 0% y castiga
+// el % global de cobertura sin aportar señal real.
 import 'package:CallSos/core/app_config.dart';
 import 'package:CallSos/core/app_providers.dart';
 import 'package:CallSos/core/app_routes.dart';
