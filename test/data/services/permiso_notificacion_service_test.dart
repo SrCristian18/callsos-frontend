@@ -35,9 +35,6 @@ class FakeNotificationSettings extends Fake
   @override
   AppleNotificationSetting get timeSensitive =>
       AppleNotificationSetting.notSupported;
-  @override
-  AndroidNotificationPriority get priority =>
-      AndroidNotificationPriority.defaultPriority;
 }
 
 void main() {

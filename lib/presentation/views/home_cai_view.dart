@@ -123,7 +123,7 @@ class _HomeCAIViewState extends State<HomeCAIView>
               icon: const Icon(Icons.logout, color: Colors.white),
               onPressed: () async {
                 await sesion.logout();
-                if (mounted) {
+                if (context.mounted) {
                   Navigator.pushReplacementNamed(
                       context, AppRoutes.roleSelection);
                 }
@@ -142,7 +142,7 @@ class _HomeCAIViewState extends State<HomeCAIView>
           ),
         ),
         body: Consumer<IncidenteListViewModel>(
-          builder: (ctx, vm, __) => TabBarView(
+          builder: (ctx, vm, _) => TabBarView(
             controller: _tabs,
             children: [
               // Tab 1 — Por asignar (DERIVADO_A_CAI)

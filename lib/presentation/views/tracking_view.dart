@@ -146,7 +146,7 @@ class _TrackingViewState extends State<TrackingView> {
           ),
           actions: [
             Consumer<TrackingViewModel>(
-              builder: (_, vm, __) => Padding(
+              builder: (_, vm, _) => Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: _ConexionIndicador(estado: vm.conexion),
               ),
@@ -211,7 +211,7 @@ class _TrackingViewState extends State<TrackingView> {
             : const LatLng(10.391, -75.4794));
 
     return Consumer<TrackingViewModel>(
-      builder: (_, vm, __) => Stack(
+      builder: (_, vm, _) => Stack(
         children: [
           // ── Mapa ───────────────────────────────────────────────────
           FlutterMap(
@@ -318,7 +318,7 @@ class _MarcadorEmergencia extends StatelessWidget {
           border: Border.all(color: Colors.white, width: 2),
           boxShadow: [
             BoxShadow(
-                color: Colors.red.withOpacity(0.4),
+                color: Colors.red.withValues(alpha: 0.4),
                 blurRadius: 8,
                 spreadRadius: 2)
           ],
@@ -339,7 +339,7 @@ class _MarcadorAgente extends StatelessWidget {
           border: Border.all(color: Colors.white, width: 2.5),
           boxShadow: [
             BoxShadow(
-                color: Colors.blue.withOpacity(0.4),
+                color: Colors.blue.withValues(alpha: 0.4),
                 blurRadius: 8,
                 spreadRadius: 2)
           ],
@@ -380,7 +380,7 @@ class _PanelInfo extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 10,
               offset: const Offset(0, -2))
         ],

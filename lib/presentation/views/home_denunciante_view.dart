@@ -3,9 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
-import '../../data/models/enums/estado_incidente.dart';
 import '../../data/models/enums/tipo_incidente_enum.dart';
-import '../../data/models/incidente.dart';
 import '../../data/models/tipo_incidente_presentacion.dart';
 import '../../data/services/incidente_service.dart';
 import '../viewmodels/crear_incidente_viewmodel.dart';
@@ -74,7 +72,7 @@ class _HomeDenuncianteViewState extends State<HomeDenuncianteView> {
               icon: const Icon(Icons.logout, color: Colors.white),
               onPressed: () async {
                 await sesion.logout();
-                if (mounted) {
+                if (context.mounted) {
                   Navigator.pushReplacementNamed(
                       context, AppRoutes.roleSelection);
                 }
@@ -83,7 +81,7 @@ class _HomeDenuncianteViewState extends State<HomeDenuncianteView> {
           ],
         ),
         body: Consumer<IncidenteListViewModel>(
-          builder: (_, vm, __) => IncidenteListBody(
+          builder: (_, vm, _) => IncidenteListBody(
             vm: vm,
             incidentes: vm.incidentes,
             mensajeVacio: 'Aún no has reportado ninguna emergencia.\n'
@@ -105,7 +103,7 @@ class _HomeDenuncianteViewState extends State<HomeDenuncianteView> {
                         accion: () =>
                             context.read<IIncidenteService>().cancelar(incidente.id),
                       );
-                      if (ok && mounted) {
+                      if (ok && context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                               content: Text('Emergencia cancelada.'),
@@ -246,12 +244,12 @@ class _BottomSheetCrearIncidenteState
                             decoration: BoxDecoration(
                               color: sel
                                   ? p.color
-                                  : p.color.withOpacity(0.1),
+                                  : p.color.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: sel
                                     ? p.color
-                                    : p.color.withOpacity(0.3),
+                                    : p.color.withValues(alpha: 0.3),
                                 width: sel ? 2 : 1,
                               ),
                             ),

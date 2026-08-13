@@ -168,13 +168,13 @@ class _HomeComandoViewState extends State<HomeComandoView>
       builder: (_) => _BottomSheetDerivar(incidente: incidente),
     );
 
-    if (confirmed == true && mounted) {
+    if (confirmed == true && context.mounted) {
       final ok = await _vm.ejecutarTransicion(
         incidenteId: incidente.id,
         accion: () =>
             context.read<IIncidenteService>().derivar(incidente.id),
       );
-      if (ok && mounted) {
+      if (ok && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Incidente derivado al CAI más cercano.'),
@@ -216,7 +216,7 @@ class _HomeComandoViewState extends State<HomeComandoView>
               icon: const Icon(Icons.logout, color: Colors.white),
               onPressed: () async {
                 await sesion.logout();
-                if (mounted) {
+                if (context.mounted) {
                   Navigator.pushReplacementNamed(
                       context, AppRoutes.roleSelection);
                 }
@@ -235,7 +235,7 @@ class _HomeComandoViewState extends State<HomeComandoView>
           ),
         ),
         body: Consumer<IncidenteListViewModel>(
-          builder: (ctx, vm, __) => TabBarView(
+          builder: (ctx, vm, _) => TabBarView(
             controller: _tabs,
             children: [
               // Tab 1 — Reportados (CREADO): listado automático real

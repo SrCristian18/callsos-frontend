@@ -6,7 +6,6 @@ import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 
 import 'package:CallSos/core/app_routes.dart';
-import 'package:CallSos/data/models/auth_result.dart';
 import 'package:CallSos/data/models/enums/rol.dart';
 import 'package:CallSos/data/services/auth_service.dart';
 import 'package:CallSos/data/services/secure_storage.dart';

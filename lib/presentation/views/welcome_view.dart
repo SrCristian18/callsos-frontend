@@ -48,8 +48,11 @@ class WelcomeView extends StatelessWidget {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                       ),
                       onPressed: () {
-                        if(role == 'policia') Navigator.pushNamed(context, AppRoutes.loginPolicia);
-                        else Navigator.pushNamed(context, AppRoutes.loginDenunciante);
+                        if (role == 'policia') {
+                          Navigator.pushNamed(context, AppRoutes.loginPolicia);
+                        } else {
+                          Navigator.pushNamed(context, AppRoutes.loginDenunciante);
+                        }
                       },
                       child: const Text("Iniciar sesion", style: TextStyle(color: Colors.white)),
                     ),
@@ -64,8 +67,11 @@ class WelcomeView extends StatelessWidget {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                       ),
                       onPressed: () {
-                        if(role == 'policia') Navigator.pushNamed(context, AppRoutes.registerPolicia);
-                        else Navigator.pushNamed(context, AppRoutes.registerDenunciante);
+                        if (role == 'policia') {
+                          Navigator.pushNamed(context, AppRoutes.registerPolicia);
+                        } else {
+                          Navigator.pushNamed(context, AppRoutes.registerDenunciante);
+                        }
                       },
                       child: const Text("Registrarse", style: TextStyle(color: Color(0xFF1B2A3B), fontWeight: FontWeight.bold)),
                     ),

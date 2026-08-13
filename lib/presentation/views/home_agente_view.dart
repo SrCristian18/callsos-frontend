@@ -121,7 +121,7 @@ class _HomeAgenteViewState extends State<HomeAgenteView> {
               icon: const Icon(Icons.logout, color: Colors.white),
               onPressed: () async {
                 await sesion.logout();
-                if (mounted) {
+                if (context.mounted) {
                   Navigator.pushReplacementNamed(
                       context, AppRoutes.roleSelection);
                 }
@@ -130,7 +130,7 @@ class _HomeAgenteViewState extends State<HomeAgenteView> {
           ],
         ),
         body: Consumer<IncidenteListViewModel>(
-          builder: (ctx, vm, __) => IncidenteListBody(
+          builder: (ctx, vm, _) => IncidenteListBody(
             vm: vm,
             incidentes: vm.incidentes,
             mensajeVacio: 'No tienes incidentes asignados.',
