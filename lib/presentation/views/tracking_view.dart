@@ -75,16 +75,25 @@ class _TrackingViewState extends State<TrackingView> {
   }
 
   Future<void> _inicializar(String incidenteId) async {
+    // DIAGNÓSTICO TEMPORAL (Bloque 4, Épica 8) — el test "Reintentar"
+    // reporta solo 1 llamada real a consultar() en vez de 2, pero el
+    // código de este método/el botón se ve correcto en revisión estática.
+    // Estas líneas confirman en la próxima corrida si _inicializar()
+    // realmente se está invocando una segunda vez y llega hasta acá.
+    // Quitar una vez diagnosticado.
+    debugPrint('[DIAG] _inicializar($incidenteId) invocado — mounted=$mounted');
     // 1 — cargar detalle del incidente para obtener coords del punto
     try {
       final inc =
           await context.read<IIncidenteService>().consultar(incidenteId);
+      debugPrint('[DIAG] consultar($incidenteId) resolvió OK');
       if (!mounted) return;
       setState(() {
         _incidente = inc;
         _cargandoIncidente = false;
       });
     } catch (_) {
+      debugPrint('[DIAG] consultar($incidenteId) lanzó excepción (esperado en el test)');
       if (mounted) {
         setState(() {
           _errorCarga = 'No se pudo cargar el incidente.';
@@ -189,12 +198,15 @@ class _TrackingViewState extends State<TrackingView> {
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () {
+                  debugPrint('[DIAG] onPressed Reintentar — _incidenteId=$_incidenteId');
                   setState(() {
                     _cargandoIncidente = true;
                     _errorCarga = null;
                   });
                   if (_incidenteId != null) {
                     _inicializar(_incidenteId!);
+                  } else {
+                    debugPrint('[DIAG] _incidenteId es null — NO se reintenta');
                   }
                 },
               ),

@@ -70,6 +70,7 @@ class _HomeDenuncianteViewState extends State<HomeDenuncianteView> {
           actions: [
             IconButton(
               icon: const Icon(Icons.logout, color: Colors.white),
+              tooltip: 'Cerrar sesión',
               onPressed: () async {
                 await sesion.logout();
                 if (context.mounted) {
