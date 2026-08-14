@@ -10,6 +10,7 @@ import '../../data/models/tipo_incidente_presentacion.dart';
 import '../../data/services/api_exception.dart';
 import '../../data/services/incidente_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
+import '../widgets/app_snackbar.dart';
 import '../widgets/estado_chip.dart';
 
 /// Detalle completo de un incidente.
@@ -77,11 +78,7 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
     try {
       await accion();
       if (mensajeExito != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(mensajeExito),
-              backgroundColor: Colors.green),
-        );
+        AppSnackBar.exito(context, mensajeExito);
       }
       if (rutaPostExito != null && mounted) {
         Navigator.pushNamed(context, rutaPostExito, arguments: args);
@@ -90,10 +87,7 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
       }
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(e.message), backgroundColor: Colors.red),
-        );
+        AppSnackBar.error(context, e.message);
       }
     } finally {
       if (mounted) setState(() => _enProceso = false);

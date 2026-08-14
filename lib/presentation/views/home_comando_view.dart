@@ -11,6 +11,7 @@ import '../../data/services/cai_service.dart';
 import '../../data/services/incidente_service.dart';
 import '../viewmodels/incidente_list_viewmodel.dart';
 import '../viewmodels/sesion_viewmodel.dart';
+import '../widgets/app_snackbar.dart';
 import '../widgets/incidente_card.dart';
 import '../widgets/incidente_list_body.dart';
 
@@ -190,12 +191,7 @@ class _HomeComandoViewState extends State<HomeComandoView>
             context.read<IIncidenteService>().derivar(incidente.id),
       );
       if (ok && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Incidente derivado al CAI más cercano.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppSnackBar.exito(context, 'Incidente derivado al CAI más cercano.');
       }
     }
   }

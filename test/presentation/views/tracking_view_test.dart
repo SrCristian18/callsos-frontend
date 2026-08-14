@@ -159,18 +159,25 @@ void main() {
     await tester.pumpWidget(appDePrueba());
     await tester.pumpAndSettle();
 
-    verify(() => incidenteService.consultar('i-001')).called(1);
+    expect(find.text('No se pudo cargar el incidente.'), findsOneWidget);
 
     await tester.tap(find.text('Reintentar'));
     await tester.pumpAndSettle();
 
-    // FIX (bug propio de este test, encontrado en Bloque 4): verify().
-    // called() en mocktail cuenta el TOTAL acumulado de invocaciones
-    // desde que se creó el mock, no incrementalmente desde el último
-    // verify(). Tras la carga inicial (1) + el reintento (1), el total
-    // real es 2 — comprobado aquí con `.called(2)`, no con `.called(1)`
-    // (que habría fallado con "Expected: 1 Actual: 2" si este test
-    // realmente se hubiera ejecutado).
+    // FIX (bug real de este test, diagnosticado en Bloque 4 con
+    // debugPrint temporales): a diferencia de lo que asumía el
+    // comentario original de este test, `verify(...).called(n)` en
+    // mocktail SÍ consume/resetea el conteo de invocaciones ya
+    // verificadas — no es un contador acumulado independiente de
+    // cuántas veces se llamó a verify() antes. Por eso un
+    // `verify(...).called(1)` a mitad de este test (justo después de la
+    // carga inicial) dejaba el conteo en 0, y el único `.called(2)` de
+    // más abajo en realidad medía solo la llamada del reintento (1), no
+    // el total (2) — de ahí el "Expected: 2, Actual: 1" real. El fix es
+    // el mismo patrón que ya usan sin problema el test
+    // "se puede reintentar más de una vez seguida..." (más abajo en
+    // este archivo) y el equivalente en detalle_incidente_view_test.dart:
+    // UN SOLO verify() al final, nunca uno intermedio.
     verify(() => incidenteService.consultar('i-001')).called(2);
 
     // El mock sigue fallando, así que debe volver a mostrar el error

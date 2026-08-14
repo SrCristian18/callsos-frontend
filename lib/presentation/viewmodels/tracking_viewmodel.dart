@@ -121,7 +121,14 @@ class TrackingViewModel extends ChangeNotifier {
     await _stomp.conectar(
       onConnected: _onConectado,
       onError: (e) {
-        _errorMessage = 'No se pudo conectar al servidor de tracking: $e';
+        // `e` ya es un mensaje armado por StompService (no una excepción
+        // cruda), pero concatenarlo tal cual duplicaba el "no se pudo
+        // conectar" y sonaba técnico para el usuario final (ej. "No se
+        // pudo conectar al servidor de tracking: Error WebSocket:
+        // Connection refused"). Mensaje único, pensado para el usuario.
+        _errorMessage =
+            'No se pudo conectar al servidor de tracking. Verifica tu '
+            'conexión e inténtalo de nuevo.';
         _setConexion(TrackingConexionEstado.error);
       },
     );

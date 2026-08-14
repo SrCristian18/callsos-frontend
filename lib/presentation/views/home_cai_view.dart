@@ -11,6 +11,7 @@ import '../../data/services/cai_service.dart';
 import '../../data/services/incidente_service.dart';
 import '../viewmodels/incidente_list_viewmodel.dart';
 import '../viewmodels/sesion_viewmodel.dart';
+import '../widgets/app_snackbar.dart';
 import '../widgets/incidente_card.dart';
 import '../widgets/incidente_list_body.dart';
 
@@ -86,12 +87,7 @@ class _HomeCAIViewState extends State<HomeCAIView>
             context.read<IIncidenteService>().asignar(incidente.id),
       );
       if (ok && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Agente asignado exitosamente.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppSnackBar.exito(context, 'Agente asignado exitosamente.');
       }
     }
   }
