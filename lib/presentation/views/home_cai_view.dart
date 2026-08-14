@@ -11,6 +11,7 @@ import '../../data/services/cai_service.dart';
 import '../../data/services/incidente_service.dart';
 import '../viewmodels/incidente_list_viewmodel.dart';
 import '../viewmodels/sesion_viewmodel.dart';
+import '../widgets/app_snackbar.dart';
 import '../widgets/incidente_card.dart';
 import '../widgets/incidente_list_body.dart';
 
@@ -86,12 +87,7 @@ class _HomeCAIViewState extends State<HomeCAIView>
             context.read<IIncidenteService>().asignar(incidente.id),
       );
       if (ok && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Agente asignado exitosamente.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppSnackBar.exito(context, 'Agente asignado exitosamente.');
       }
     }
   }
@@ -259,9 +255,12 @@ class _BottomSheetAsignarAgenteState
           Row(children: [
             const Icon(Icons.person_add_outlined, size: 24),
             const SizedBox(width: 10),
-            const Text('Asignar agente',
-                style:
-                    TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Flexible(
+              child: Text('Asignar agente',
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
             const Spacer(),
             IconButton(
                 icon: const Icon(Icons.close),
@@ -320,7 +319,18 @@ class _BottomSheetAsignarAgenteState
                   child: Row(children: [
                     Icon(Icons.person, size: 18, color: Colors.green.shade700),
                     const SizedBox(width: 8),
-                    Text(a.nombre, style: const TextStyle(fontSize: 13)),
+                    // FIX (Bloque 4, Épica 8): sin Expanded, un nombre de
+                    // agente largo desborda el Row horizontalmente — el
+                    // SingleChildScrollView del sheet solo protege el eje
+                    // vertical. Con Expanded + ellipsis, un nombre largo se
+                    // trunca en vez de romper el layout.
+                    Expanded(
+                      child: Text(
+                        a.nombre,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
                   ]),
                 )),
 

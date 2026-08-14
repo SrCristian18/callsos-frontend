@@ -9,6 +9,7 @@ import '../../data/services/incidente_service.dart';
 import '../viewmodels/crear_incidente_viewmodel.dart';
 import '../viewmodels/incidente_list_viewmodel.dart';
 import '../viewmodels/sesion_viewmodel.dart';
+import '../widgets/app_snackbar.dart';
 import '../widgets/incidente_list_body.dart';
 import '../widgets/incidente_card.dart';
 
@@ -70,6 +71,7 @@ class _HomeDenuncianteViewState extends State<HomeDenuncianteView> {
           actions: [
             IconButton(
               icon: const Icon(Icons.logout, color: Colors.white),
+              tooltip: 'Cerrar sesión',
               onPressed: () async {
                 await sesion.logout();
                 if (context.mounted) {
@@ -110,11 +112,7 @@ class _HomeDenuncianteViewState extends State<HomeDenuncianteView> {
                             context.read<IIncidenteService>().cancelar(incidente.id),
                       );
                       if (ok && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Emergencia cancelada.'),
-                              backgroundColor: Colors.orange),
-                        );
+                        AppSnackBar.advertencia(context, 'Emergencia cancelada.');
                       }
                     }
                   : null,
@@ -428,13 +426,11 @@ class _BottomSheetCrearIncidenteState
                                   if (ok && context.mounted) {
                                     widget.onExito();
                                     Navigator.pop(context);
-                                    ScaffoldMessenger.of(context)
-                                        .showSnackBar(const SnackBar(
-                                      content: Text(
-                                          '✅ Emergencia reportada. Las autoridades han sido notificadas.'),
-                                      backgroundColor: Colors.green,
-                                      duration: Duration(seconds: 4),
-                                    ));
+                                    AppSnackBar.exito(
+                                      context,
+                                      'Emergencia reportada. Las autoridades '
+                                      'han sido notificadas.',
+                                    );
                                   }
                                 }
                               : null,

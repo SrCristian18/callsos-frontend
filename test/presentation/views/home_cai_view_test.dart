@@ -287,4 +287,33 @@ void main() {
     expect(find.text('Carlos Agente Uno'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  // Bloque 4 (Épica 8) — nombre de agente extremadamente largo. El fix
+  // (Expanded + TextOverflow.ellipsis en la fila del agente, ver
+  // home_cai_view.dart) ya está aplicado; este test lo deja verificado
+  // para que no se rompa sin querer en un cambio futuro.
+  testWidgets('un nombre de agente muy largo se trunca (ellipsis), no desborda el Row',
+      (tester) async {
+    final nombreLargo =
+        'Juan Carlos Alejandro de la Santísima Trinidad Rodríguez Pérez '
+        'González Martínez'; // ~85 caracteres, muy por encima de un nombre real
+
+    when(() => incidenteService.porCai())
+        .thenAnswer((_) async => [_fake('i-001', EstadoIncidente.DERIVADO_A_CAI)]);
+    when(() => caiService.agentesDisponibles('cai-001')).thenAnswer((_) async => [
+          AgenteDisponible(id: 'ag-001', nombre: nombreLargo, estado: EstadoAgente.DISPONIBLE),
+        ]);
+
+    await tester.pumpWidget(appDePrueba());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Asignar Agente'));
+    await tester.pumpAndSettle();
+
+    // El texto completo SÍ está en el árbol de widgets (Text no lo corta
+    // a nivel de string, solo visualmente vía overflow: ellipsis) — lo
+    // que este test realmente verifica es que renderizar ese Text no
+    // lance ninguna excepción de layout.
+    expect(find.text(nombreLargo), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

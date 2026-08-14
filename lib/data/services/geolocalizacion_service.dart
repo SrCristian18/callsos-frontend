@@ -134,9 +134,19 @@ class GeolocalizacionService implements IGeolocalizacionService {
         'No se concedió permiso de ubicación. '
         'Verifica los permisos de la app en ajustes.',
       );
-    } catch (e) {
-      throw GeolocalizacionException(
-        'No se pudo obtener la ubicación: $e',
+    } catch (_) {
+      // Fallback genérico — cualquier otra falla de la plataforma/plugin
+      // (timeout del GPS, error nativo desconocido, etc.). Antes esto
+      // interpolaba `$e` crudo en el mensaje (p. ej. algo como
+      // "TimeoutException after 0:00:15.000000: Future not completed"),
+      // exponiendo texto técnico de Dart/plataforma directo al
+      // denunciante en medio de reportar una emergencia — justo el
+      // anti-patrón que Bloque 5 (Épica 8) pide evitar: el mensaje al
+      // usuario debe ser siempre texto pensado para él, nunca
+      // Exception.toString().
+      throw const GeolocalizacionException(
+        'No se pudo obtener la ubicación. Verifica tu conexión y que el '
+        'GPS tenga buena señal, e inténtalo de nuevo.',
       );
     }
   }

@@ -6,6 +6,7 @@ import '../../core/colores_app.dart';
 import '../../data/services/reporte_service.dart';
 import '../viewmodels/reporte_hallazgos_viewmodel.dart';
 import '../viewmodels/sesion_viewmodel.dart';
+import '../widgets/app_snackbar.dart';
 
 /// Formulario de reporte de hallazgos — completado por el agente al
 /// finalizar la atención.
@@ -74,14 +75,9 @@ class _ReporteHallazgosViewState extends State<ReporteHallazgosView> {
         AppRoutes.homeAgente,
         (route) => false,
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            '✅ Reporte enviado. Incidente finalizado correctamente.',
-          ),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 4),
-        ),
+      AppSnackBar.exito(
+        context,
+        'Reporte enviado. Incidente finalizado correctamente.',
       );
     }
   }
