@@ -184,7 +184,44 @@ void main() {
     });
 
     testWidgets(
-        'tocar "Cancelar emergencia" llama service.cancelar(), refresca la lista '
+        'tocar "Cancelar emergencia" muestra el diálogo de confirmación '
+        'y NO llama a cancelar() todavía (Épica 8, Bloque 1)', (tester) async {
+      when(() => incidenteService.misIncidentes())
+          .thenAnswer((_) async => [_fake('i-003', EstadoIncidente.CREADO)]);
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancelar emergencia'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Cancelar emergencia?'), findsOneWidget);
+      expect(find.text('Sí, cancelar'), findsOneWidget);
+      expect(find.text('No, volver'), findsOneWidget);
+      verifyNever(() => incidenteService.cancelar(any()));
+    });
+
+    testWidgets('en el diálogo, "No, volver" cierra el diálogo sin cancelar nada',
+        (tester) async {
+      when(() => incidenteService.misIncidentes())
+          .thenAnswer((_) async => [_fake('i-003', EstadoIncidente.CREADO)]);
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancelar emergencia'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('No, volver'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Cancelar emergencia?'), findsNothing);
+      verifyNever(() => incidenteService.cancelar(any()));
+      // La card sigue como estaba — nada de esto refrescó la lista.
+      verify(() => incidenteService.misIncidentes()).called(1);
+    });
+
+    testWidgets(
+        'en el diálogo, "Sí, cancelar" llama service.cancelar(), refresca la lista '
         'y muestra el snackbar naranja', (tester) async {
       when(() => incidenteService.misIncidentes())
           .thenAnswer((_) async => [_fake('i-003', EstadoIncidente.CREADO)]);
@@ -195,7 +232,10 @@ void main() {
 
       await tester.tap(find.text('Cancelar emergencia'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Sí, cancelar'));
+      await tester.pumpAndSettle();
 
+      expect(find.text('¿Cancelar emergencia?'), findsNothing);
       verify(() => incidenteService.cancelar('i-003')).called(1);
       verify(() => incidenteService.misIncidentes()).called(2); // carga inicial + refresco
       expect(find.text('Emergencia cancelada.'), findsOneWidget);
@@ -226,6 +266,18 @@ void main() {
 
       expect(sesion.isAuthenticated, isFalse);
       expect(find.text('role_selection'), findsOneWidget);
+    });
+
+    // Épica 8, Bloque 2, ítem 4.
+    testWidgets('el botón de logout expone tooltip "Cerrar sesión" (accesibilidad)',
+        (tester) async {
+      when(() => incidenteService.porEstado(EstadoIncidente.CREADO))
+          .thenAnswer((_) async => []);
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Cerrar sesión'), findsOneWidget);
     });
   });
 

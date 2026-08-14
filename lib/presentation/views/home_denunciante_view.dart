@@ -3,9 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
-import '../../data/models/enums/estado_incidente.dart';
 import '../../data/models/enums/tipo_incidente_enum.dart';
-import '../../data/models/incidente.dart';
 import '../../data/models/tipo_incidente_presentacion.dart';
 import '../../data/services/incidente_service.dart';
 import '../viewmodels/crear_incidente_viewmodel.dart';
@@ -74,7 +72,7 @@ class _HomeDenuncianteViewState extends State<HomeDenuncianteView> {
               icon: const Icon(Icons.logout, color: Colors.white),
               onPressed: () async {
                 await sesion.logout();
-                if (mounted) {
+                if (context.mounted) {
                   Navigator.pushReplacementNamed(
                       context, AppRoutes.roleSelection);
                 }
@@ -83,7 +81,7 @@ class _HomeDenuncianteViewState extends State<HomeDenuncianteView> {
           ],
         ),
         body: Consumer<IncidenteListViewModel>(
-          builder: (_, vm, __) => IncidenteListBody(
+          builder: (_, vm, _) => IncidenteListBody(
             vm: vm,
             incidentes: vm.incidentes,
             mensajeVacio: 'Aún no has reportado ninguna emergencia.\n'
@@ -100,12 +98,18 @@ class _HomeDenuncianteViewState extends State<HomeDenuncianteView> {
               labelAccion: incidente.estaActivo ? 'Cancelar emergencia' : null,
               onAccion: incidente.estaActivo
                   ? () async {
+                      // Épica 8, Bloque 1: cancelar una emergencia real es
+                      // irreversible — antes, un solo tap accidental la
+                      // cancelaba sin ningún paso intermedio.
+                      final confirmar = await _confirmarCancelacion(context);
+                      if (!confirmar || !context.mounted) return;
+
                       final ok = await vm.ejecutarTransicion(
                         incidenteId: incidente.id,
                         accion: () =>
                             context.read<IIncidenteService>().cancelar(incidente.id),
                       );
-                      if (ok && mounted) {
+                      if (ok && context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                               content: Text('Emergencia cancelada.'),
@@ -144,6 +148,35 @@ class _HomeDenuncianteViewState extends State<HomeDenuncianteView> {
         ),
       ),
     );
+  }
+
+  /// Épica 8, Bloque 1 — confirmación antes de cancelar una emergencia
+  /// real. Devuelve `true` solo si el usuario elige explícitamente
+  /// "Sí, cancelar"; cualquier otro cierre del diálogo (botón "No",
+  /// tocar afuera, back) se interpreta como "no cancelar".
+  Future<bool> _confirmarCancelacion(BuildContext context) async {
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('¿Cancelar emergencia?'),
+        content: const Text(
+          'Esta acción no se puede deshacer. Si ya hay un agente asignado '
+          'o en camino, dejará de atender este caso.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('No, volver'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Sí, cancelar'),
+          ),
+        ],
+      ),
+    );
+    return confirmado ?? false;
   }
 }
 
@@ -246,12 +279,12 @@ class _BottomSheetCrearIncidenteState
                             decoration: BoxDecoration(
                               color: sel
                                   ? p.color
-                                  : p.color.withOpacity(0.1),
+                                  : p.color.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: sel
                                     ? p.color
-                                    : p.color.withOpacity(0.3),
+                                    : p.color.withValues(alpha: 0.3),
                                 width: sel ? 2 : 1,
                               ),
                             ),

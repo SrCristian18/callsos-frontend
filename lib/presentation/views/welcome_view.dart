@@ -20,6 +20,7 @@ class WelcomeView extends StatelessWidget {
               padding: const EdgeInsets.only(left: 10, top: 10),
               child: IconButton(
                 icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.verdeOscuro),
+                tooltip: 'Volver',
                 onPressed: () => Navigator.pop(context),
               ),
             ),
@@ -67,7 +68,7 @@ class WelcomeView extends StatelessWidget {
                         if(role == 'policia') Navigator.pushNamed(context, AppRoutes.registerPolicia);
                         else Navigator.pushNamed(context, AppRoutes.registerDenunciante);
                       },
-                      child: const Text("Registrarse", style: TextStyle(color: Color(0xFF1B2A3B), fontWeight: FontWeight.bold)),
+                      child: const Text("Registrarse", style: TextStyle(color: AppColors.negroTexto, fontWeight: FontWeight.bold)),
                     ),
             const SizedBox(height: 20),
                   ],

@@ -121,6 +121,7 @@ class _HomeCAIViewState extends State<HomeCAIView>
           actions: [
             IconButton(
               icon: const Icon(Icons.logout, color: Colors.white),
+              tooltip: 'Cerrar sesión',
               onPressed: () async {
                 await sesion.logout();
                 if (mounted) {
@@ -264,6 +265,7 @@ class _BottomSheetAsignarAgenteState
             const Spacer(),
             IconButton(
                 icon: const Icon(Icons.close),
+                tooltip: 'Cerrar',
                 onPressed: () => Navigator.pop(context, false)),
           ]),
           const SizedBox(height: 4),

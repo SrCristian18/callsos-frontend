@@ -188,4 +188,40 @@ void main() {
           descripcion: any(named: 'descripcion'),
         ));
   });
+
+  // Bloque 4 (Épica 8) — pantalla chica + texto largo.
+  group('Responsive', () {
+    testWidgets('no desborda en pantalla chica (375x667)', (tester) async {
+      tester.view.physicalSize = const Size(375, 667);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('no desborda escribiendo una descripción de ~200 caracteres',
+        (tester) async {
+      final descripcionLarga = 'Al llegar al lugar se encontró que la '
+          'situación ya había sido resuelta por los vecinos del sector, '
+          'no se encontraron elementos de interés criminalístico ni '
+          'personas heridas, se recomienda hacer seguimiento preventivo '
+          'en la zona durante los próximos días.'; // ~250 caracteres
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), descripcionLarga);
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      final boton = tester.widget<ElevatedButton>(
+        find.widgetWithText(ElevatedButton, 'Enviar reporte'),
+      );
+      expect(boton.onPressed, isNotNull);
+    });
+  });
 }

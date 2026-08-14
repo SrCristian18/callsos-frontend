@@ -36,6 +36,20 @@ class EstadoChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final config = _configPorEstado(estado);
 
+    // Sin este Semantics explícito, un lector de pantalla anuncia solo la
+    // etiqueta suelta ("Creado", "Cancelado"...) sin contexto de que es
+    // el ESTADO del incidente — y en el modo compacto, el punto de color
+    // es puramente decorativo (no comunica nada por sí solo a un lector
+    // de pantalla ni a un usuario daltónico). `excludeSemantics: true`
+    // evita que el Text hijo se anuncie una segunda vez por separado.
+    return Semantics(
+      label: 'Estado del incidente: ${config.etiqueta}',
+      excludeSemantics: true,
+      child: _buildVisual(config),
+    );
+  }
+
+  Widget _buildVisual(_EstadoConfig config) {
     if (compact) {
       return Row(
         mainAxisSize: MainAxisSize.min,

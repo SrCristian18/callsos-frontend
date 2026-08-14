@@ -200,4 +200,16 @@ void main() {
     expect(sesion.isAuthenticated, isFalse);
     expect(find.text('role_selection'), findsOneWidget);
   });
+
+  // Épica 8, Bloque 2, ítem 4 — al menos 1 test por IconButton crítico
+  // que confirme que expone su nombre accesible a un lector de pantalla.
+  testWidgets('el botón de logout expone tooltip "Cerrar sesión" (accesibilidad)',
+      (tester) async {
+    when(() => incidenteService.asignados()).thenAnswer((_) async => []);
+
+    await tester.pumpWidget(appDePrueba());
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Cerrar sesión'), findsOneWidget);
+  });
 }

@@ -74,7 +74,13 @@ class _HomeComandoViewState extends State<HomeComandoView>
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
           title: const Text('Generar invitación de agente'),
-          content: Column(
+          // Bloque 4 (Épica 8) — AlertDialog no hace scroll de su content
+          // por defecto. El error de ApiException puede ser un mensaje
+          // largo (ver ApiException.message, sin límite de longitud del
+          // backend); sin este SingleChildScrollView, un mensaje largo en
+          // una pantalla chica podría desbordar el diálogo.
+          content: SingleChildScrollView(
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -114,6 +120,7 @@ class _HomeComandoViewState extends State<HomeComandoView>
                 ),
               ],
             ],
+            ),
           ),
           actions: [
             TextButton(
@@ -163,6 +170,14 @@ class _HomeComandoViewState extends State<HomeComandoView>
       BuildContext context, Incidente incidente) async {
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
+      // Bloque 4 (Épica 8) — mismo fix que ya se aplicó en
+      // HomeCAIView/HomeDenuncianteView: sin isScrollControlled: true,
+      // el sheet queda limitado a una fracción fija de la pantalla y su
+      // contenido (sin SingleChildScrollView) puede desbordar en
+      // pantallas chicas. Por consistencia con los otros 2 sheets del
+      // proyecto, se aplica aquí también aunque el contenido actual sea
+      // corto y estático.
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => _BottomSheetDerivar(incidente: incidente),
@@ -214,6 +229,7 @@ class _HomeComandoViewState extends State<HomeComandoView>
             ),
             IconButton(
               icon: const Icon(Icons.logout, color: Colors.white),
+              tooltip: 'Cerrar sesión',
               onPressed: () async {
                 await sesion.logout();
                 if (mounted) {
@@ -300,7 +316,8 @@ class _BottomSheetDerivar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-      child: Column(
+      child: SingleChildScrollView(
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -313,6 +330,7 @@ class _BottomSheetDerivar extends StatelessWidget {
             const Spacer(),
             IconButton(
                 icon: const Icon(Icons.close),
+                tooltip: 'Cerrar',
                 onPressed: () => Navigator.pop(context, false)),
           ]),
           const SizedBox(height: 4),
@@ -367,6 +385,7 @@ class _BottomSheetDerivar extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }

@@ -22,16 +22,19 @@ import '../../data/services/incidente_service.dart';
 ///   y refresca la lista automáticamente.
 /// - [incidentesPorEstado]: filtra la lista por uno o varios estados.
 class IncidenteListViewModel extends ChangeNotifier {
-  final IIncidenteService _service;
-
   /// Función que determina qué endpoint llama este ViewModel.
   final Future<List<Incidente>> Function() _fetchFn;
 
+  // NOTA: `service` se recibe (y se mantiene como parámetro requerido del
+  // constructor a propósito, para no romper los 4 call sites — Homes por
+  // rol — que ya lo pasan) pero nunca se usa: toda la interacción con la
+  // API pasa por closures inyectados (`fetchFn` aquí, y `accion` en
+  // [ejecutarTransicion]). Guardarlo en un campo era código muerto —
+  // `flutter analyze` lo marcaba como `unused_field`.
   IncidenteListViewModel({
     required IIncidenteService service,
     required Future<List<Incidente>> Function() fetchFn,
-  })  : _service = service,
-        _fetchFn = fetchFn;
+  }) : _fetchFn = fetchFn;
 
   // ── Estado ─────────────────────────────────────────────────────────
   List<Incidente> _incidentes = [];

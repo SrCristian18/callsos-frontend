@@ -96,6 +96,7 @@ class _ReporteHallazgosViewState extends State<ReporteHallazgosView> {
           backgroundColor: AppColors.negroTexto,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+            tooltip: 'Volver',
             onPressed: () => Navigator.pop(context),
           ),
           title: const Text(

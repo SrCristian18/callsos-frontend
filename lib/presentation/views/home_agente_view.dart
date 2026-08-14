@@ -119,6 +119,7 @@ class _HomeAgenteViewState extends State<HomeAgenteView> {
           actions: [
             IconButton(
               icon: const Icon(Icons.logout, color: Colors.white),
+              tooltip: 'Cerrar sesión',
               onPressed: () async {
                 await sesion.logout();
                 if (mounted) {

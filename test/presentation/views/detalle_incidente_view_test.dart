@@ -256,4 +256,49 @@ void main() {
 
     verify(() => incidenteService.consultar('i-001')).called(2);
   });
+
+  // Bloque 4 (Épica 8) — pantalla chica + texto largo.
+  group('Responsive', () {
+    testWidgets('no desborda en pantalla chica (375x667) con todos los '
+        'bloques visibles (CAI, coordenadas, botón de acción)', (tester) async {
+      tester.view.physicalSize = const Size(375, 667);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await loguearComo('com-001', Rol.COMANDO);
+      when(() => incidenteService.consultar('i-001')).thenAnswer((_) async =>
+          _fake('i-001', EstadoIncidente.DERIVADO_A_CAI, nombreCAI: 'CAI San José'));
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('no desborda con una descripción de ~200 caracteres', (tester) async {
+      await loguearComo('ag-001', Rol.AGENTE);
+      final descripcionLarga = 'Se reporta una situación de robo en la vía '
+          'pública, presuntamente con arma blanca, el sujeto huyó en '
+          'dirección al norte por la carrera principal, se solicita '
+          'atención urgente ya que hay varios testigos presentes en el '
+          'lugar de los hechos.'; // ~230 caracteres
+      when(() => incidenteService.consultar('i-001')).thenAnswer((_) async => Incidente(
+            id: 'i-001',
+            fechaHora: DateTime(2026, 6, 14, 10, 30),
+            tipo: TipoIncidenteEnum.ROBOS_O_ASALTOS,
+            descripcion: descripcionLarga,
+            estado: EstadoIncidente.AGENTE_ASIGNADO,
+            latitud: 10.391,
+            longitud: -75.4794,
+            denuncianteId: 'den-001',
+          ));
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('varios testigos presentes'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
 }

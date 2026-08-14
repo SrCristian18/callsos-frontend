@@ -138,6 +138,7 @@ class _TrackingViewState extends State<TrackingView> {
           leading: IconButton(
             icon:
                 const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+            tooltip: 'Volver',
             onPressed: () => Navigator.pop(context),
           ),
           title: const Text(
