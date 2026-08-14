@@ -78,9 +78,9 @@ class EstadoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: config.color.withOpacity(0.15),
+        color: config.color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: config.color.withOpacity(0.4)),
+        border: Border.all(color: config.color.withValues(alpha: 0.4)),
       ),
       child: Text(
         config.etiqueta,
