@@ -69,9 +69,53 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'CallSOS',
         debugShowCheckedModeBanner: false,
+        // Bloque 3 (Épica 8) — antes solo primarySwatch +
+        // scaffoldBackgroundColor. Se amplía para que botones/inputs
+        // NUEVOS hereden un estilo consistente en vez de redefinirlo
+        // vista por vista (hoy 65 usos de fontSize repartidos a mano).
+        // No migra las vistas existentes — todas definen su propio
+        // `style:` explícito (ElevatedButton.styleFrom, decoración manual
+        // en CustomInput), así que esto no las afecta; solo aplica como
+        // default a widgets que no sobrescriban su estilo.
         theme: ThemeData(
           primarySwatch: Colors.green,
           scaffoldBackgroundColor: AppColors.blancoVerde,
+          colorScheme: const ColorScheme.light(
+            primary: AppColors.verdeOscuro,
+            secondary: AppColors.verdeClaro,
+            surface: AppColors.blancoVerde,
+            onPrimary: Colors.white,
+            onSecondary: Colors.white,
+          ),
+          // Mismo patrón repetido en cada ElevatedButton.styleFrom de las
+          // vistas actuales (login, register, home, reporte hallazgos):
+          // ancho completo, esquinas redondeadas 25, fondo oscuro, texto
+          // blanco. Queda como default; cada vista puede seguir
+          // sobrescribiéndolo puntualmente si necesita otro color.
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.negroTexto,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+            ),
+          ),
+          // Mismo patrón de CustomInput (Container blanco redondeado, sin
+          // borde propio) para cualquier TextField/TextFormField que se
+          // use directamente sin pasar por CustomInput (ej. diálogos
+          // simples como el de "Generar invitación" en HomeComandoView).
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(15),
+              borderSide: BorderSide.none,
+            ),
+          ),
         ),
         initialRoute: AppRoutes.initial,
         routes: AppRoutes.routes,

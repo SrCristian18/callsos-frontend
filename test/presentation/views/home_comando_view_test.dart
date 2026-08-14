@@ -276,4 +276,76 @@ void main() {
     expect(sesion.isAuthenticated, isFalse);
     expect(find.text('role_selection'), findsOneWidget);
   });
+
+  // Épica 8, Bloque 2, ítem 4.
+  testWidgets('el botón de logout expone tooltip "Cerrar sesión" (accesibilidad)',
+      (tester) async {
+    when(() => incidenteService.porEstado(EstadoIncidente.CREADO))
+        .thenAnswer((_) async => []);
+
+    await tester.pumpWidget(appDePrueba());
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Cerrar sesión'), findsOneWidget);
+  });
+
+  // Bloque 4 (Épica 8) — pantalla chica (iPhone SE: 375x667 lógicos).
+  group('Responsive — pantalla chica (375x667)', () {
+    Future<void> conPantallaChica(WidgetTester tester, Future<void> Function() body) async {
+      tester.view.physicalSize = const Size(375, 667);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await body();
+    }
+
+    testWidgets('sheet "Derivar a CAI" no desborda en pantalla chica '
+        '(fix Bloque 4: isScrollControlled + SingleChildScrollView)',
+        (tester) async {
+      await conPantallaChica(tester, () async {
+        when(() => incidenteService.porEstado(EstadoIncidente.CREADO))
+            .thenAnswer((_) async => [_fake('i-001', EstadoIncidente.CREADO)]);
+
+        await tester.pumpWidget(appDePrueba());
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Derivar a CAI'));
+        await tester.pumpAndSettle();
+
+        // Si hubiera desbordado, pumpAndSettle habría lanzado una excepción
+        // de overflow (FlutterError) antes de llegar aquí.
+        expect(find.text('Confirmar derivación'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    });
+
+    testWidgets('diálogo de invitación con mensaje de error largo (~200 '
+        'caracteres) no desborda en pantalla chica (fix Bloque 4: '
+        'SingleChildScrollView en el content)', (tester) async {
+      await conPantallaChica(tester, () async {
+        final mensajeLargo = 'El CAI especificado no existe en el sistema. '
+            'Verifica el identificador e intenta nuevamente. Si el '
+            'problema persiste, contacta al administrador del sistema '
+            'para confirmar que la unidad policial esté correctamente '
+            'registrada en la base de datos.'; // ~280 caracteres
+        when(() => incidenteService.porEstado(EstadoIncidente.CREADO))
+            .thenAnswer((_) async => []);
+        when(() => caiService.generarInvitacion(any())).thenThrow(
+          ApiException(type: ApiExceptionType.notFound, message: mensajeLargo),
+        );
+
+        await tester.pumpWidget(appDePrueba());
+        await tester.pumpAndSettle();
+        await tester.tap(find.byIcon(Icons.vpn_key_outlined));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(find.byType(TextField), 'cai-x');
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Generar'));
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining('no existe en el sistema'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    });
+  });
 }

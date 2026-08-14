@@ -108,6 +108,7 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
         backgroundColor: AppColors.verdeOscuro,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+          tooltip: 'Volver',
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -119,6 +120,7 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Actualizar',
             onPressed: _isLoading ? null : _cargar,
           ),
         ],
@@ -183,7 +185,7 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
+                    color: Colors.black.withOpacity(0.06),
                     blurRadius: 10,
                     offset: const Offset(0, 3))
               ],

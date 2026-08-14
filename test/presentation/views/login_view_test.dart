@@ -127,4 +127,11 @@ void main() {
 
     expect(find.text('forgot_password'), findsOneWidget);
   });
+
+  // Épica 8, Bloque 2, ítem 4 — botón "back" crítico.
+  testWidgets('el botón de volver expone tooltip "Volver" (accesibilidad)', (tester) async {
+    await tester.pumpWidget(appDePrueba());
+
+    expect(find.byTooltip('Volver'), findsOneWidget);
+  });
 }

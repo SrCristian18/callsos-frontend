@@ -14,6 +14,7 @@ class ForgotPasswordView extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.verdeOscuro),
+          tooltip: 'Volver',
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -28,7 +29,7 @@ class ForgotPasswordView extends StatelessWidget {
               style: TextStyle(
                 fontSize: 32, 
                 fontWeight: FontWeight.bold, 
-                color: Color(0xFF1B2A3B),
+                color: AppColors.negroTexto,
                 height: 1.1
               ),
             ),
@@ -45,7 +46,7 @@ class ForgotPasswordView extends StatelessWidget {
             Center(
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1B2A3B),
+                  backgroundColor: AppColors.negroTexto,
                   padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                 ),

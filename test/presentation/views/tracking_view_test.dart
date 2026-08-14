@@ -164,8 +164,14 @@ void main() {
     await tester.tap(find.text('Reintentar'));
     await tester.pumpAndSettle();
 
-    // Debe haber una SEGUNDA llamada real — el corazón del fix.
-    verify(() => incidenteService.consultar('i-001')).called(1);
+    // FIX (bug propio de este test, encontrado en Bloque 4): verify().
+    // called() en mocktail cuenta el TOTAL acumulado de invocaciones
+    // desde que se creó el mock, no incrementalmente desde el último
+    // verify(). Tras la carga inicial (1) + el reintento (1), el total
+    // real es 2 — comprobado aquí con `.called(2)`, no con `.called(1)`
+    // (que habría fallado con "Expected: 1 Actual: 2" si este test
+    // realmente se hubiera ejecutado).
+    verify(() => incidenteService.consultar('i-001')).called(2);
 
     // El mock sigue fallando, así que debe volver a mostrar el error
     // (no quedarse pegado en el spinner) — prueba que el ciclo completo
@@ -192,5 +198,25 @@ void main() {
     // 1 carga inicial + 2 reintentos = 3 llamadas totales.
     verify(() => incidenteService.consultar('i-001')).called(3);
     expect(find.text('Reintentar'), findsOneWidget);
+  });
+
+  // Bloque 4 (Épica 8) — pantalla chica. Limitado a los estados de carga/
+  // error por la misma razón documentada arriba: no podemos dejar que
+  // _inicializar() llegue a _vm.iniciar() (STOMP real) en un test.
+  testWidgets('estado de error no desborda en pantalla chica (375x667)',
+      (tester) async {
+    tester.view.physicalSize = const Size(375, 667);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    when(() => incidenteService.consultar('i-001'))
+        .thenThrow(Exception('Sin conexión'));
+
+    await tester.pumpWidget(appDePrueba());
+    await tester.pumpAndSettle();
+
+    expect(find.text('No se pudo cargar el incidente.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

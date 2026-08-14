@@ -67,6 +67,7 @@ class _LoginViewState extends State<LoginView> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new,
               color: AppColors.verdeOscuro),
+          tooltip: 'Volver',
           onPressed: () => Navigator.pop(context),
         ),
       ),

@@ -119,9 +119,10 @@ class _HomeAgenteViewState extends State<HomeAgenteView> {
           actions: [
             IconButton(
               icon: const Icon(Icons.logout, color: Colors.white),
+              tooltip: 'Cerrar sesión',
               onPressed: () async {
                 await sesion.logout();
-                if (context.mounted) {
+                if (mounted) {
                   Navigator.pushReplacementNamed(
                       context, AppRoutes.roleSelection);
                 }
@@ -130,7 +131,7 @@ class _HomeAgenteViewState extends State<HomeAgenteView> {
           ],
         ),
         body: Consumer<IncidenteListViewModel>(
-          builder: (ctx, vm, _) => IncidenteListBody(
+          builder: (ctx, vm, __) => IncidenteListBody(
             vm: vm,
             incidentes: vm.incidentes,
             mensajeVacio: 'No tienes incidentes asignados.',

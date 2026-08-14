@@ -98,6 +98,12 @@ class _HomeDenuncianteViewState extends State<HomeDenuncianteView> {
               labelAccion: incidente.estaActivo ? 'Cancelar emergencia' : null,
               onAccion: incidente.estaActivo
                   ? () async {
+                      // Épica 8, Bloque 1: cancelar una emergencia real es
+                      // irreversible — antes, un solo tap accidental la
+                      // cancelaba sin ningún paso intermedio.
+                      final confirmar = await _confirmarCancelacion(context);
+                      if (!confirmar || !context.mounted) return;
+
                       final ok = await vm.ejecutarTransicion(
                         incidenteId: incidente.id,
                         accion: () =>
@@ -142,6 +148,35 @@ class _HomeDenuncianteViewState extends State<HomeDenuncianteView> {
         ),
       ),
     );
+  }
+
+  /// Épica 8, Bloque 1 — confirmación antes de cancelar una emergencia
+  /// real. Devuelve `true` solo si el usuario elige explícitamente
+  /// "Sí, cancelar"; cualquier otro cierre del diálogo (botón "No",
+  /// tocar afuera, back) se interpreta como "no cancelar".
+  Future<bool> _confirmarCancelacion(BuildContext context) async {
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('¿Cancelar emergencia?'),
+        content: const Text(
+          'Esta acción no se puede deshacer. Si ya hay un agente asignado '
+          'o en camino, dejará de atender este caso.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('No, volver'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Sí, cancelar'),
+          ),
+        ],
+      ),
+    );
+    return confirmado ?? false;
   }
 }
 

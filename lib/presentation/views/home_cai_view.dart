@@ -121,9 +121,10 @@ class _HomeCAIViewState extends State<HomeCAIView>
           actions: [
             IconButton(
               icon: const Icon(Icons.logout, color: Colors.white),
+              tooltip: 'Cerrar sesión',
               onPressed: () async {
                 await sesion.logout();
-                if (context.mounted) {
+                if (mounted) {
                   Navigator.pushReplacementNamed(
                       context, AppRoutes.roleSelection);
                 }
@@ -142,7 +143,7 @@ class _HomeCAIViewState extends State<HomeCAIView>
           ),
         ),
         body: Consumer<IncidenteListViewModel>(
-          builder: (ctx, vm, _) => TabBarView(
+          builder: (ctx, vm, __) => TabBarView(
             controller: _tabs,
             children: [
               // Tab 1 — Por asignar (DERIVADO_A_CAI)
@@ -264,6 +265,7 @@ class _BottomSheetAsignarAgenteState
             const Spacer(),
             IconButton(
                 icon: const Icon(Icons.close),
+                tooltip: 'Cerrar',
                 onPressed: () => Navigator.pop(context, false)),
           ]),
           const SizedBox(height: 4),

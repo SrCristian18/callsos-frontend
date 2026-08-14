@@ -247,4 +247,44 @@ void main() {
     expect(sesion.isAuthenticated, isFalse);
     expect(find.text('role_selection'), findsOneWidget);
   });
+
+  // Épica 8, Bloque 2, ítem 4.
+  testWidgets('el botón de logout expone tooltip "Cerrar sesión" (accesibilidad)',
+      (tester) async {
+    when(() => incidenteService.porCai()).thenAnswer((_) async => []);
+
+    await tester.pumpWidget(appDePrueba());
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Cerrar sesión'), findsOneWidget);
+  });
+
+  // Bloque 4 (Épica 8) — pantalla chica. Ya se encontró y corrigió un bug
+  // real de este tipo en este mismo archivo (sheet de asignar agente sin
+  // isScrollControlled) — este test cubre el caso con VARIOS agentes en
+  // la lista, el escenario más exigente para el sheet.
+  testWidgets('sheet "Asignar Agente" con varios agentes no desborda en '
+      'pantalla chica (375x667)', (tester) async {
+    tester.view.physicalSize = const Size(375, 667);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    when(() => incidenteService.porCai())
+        .thenAnswer((_) async => [_fake('i-001', EstadoIncidente.DERIVADO_A_CAI)]);
+    when(() => caiService.agentesDisponibles('cai-001')).thenAnswer((_) async => [
+          const AgenteDisponible(id: 'ag-001', nombre: 'Carlos Agente Uno', estado: EstadoAgente.DISPONIBLE),
+          const AgenteDisponible(id: 'ag-002', nombre: 'Ana Agente Dos', estado: EstadoAgente.DISPONIBLE),
+          const AgenteDisponible(id: 'ag-003', nombre: 'Pedro Agente Tres', estado: EstadoAgente.DISPONIBLE),
+          const AgenteDisponible(id: 'ag-004', nombre: 'Luisa Agente Cuatro', estado: EstadoAgente.DISPONIBLE),
+        ]);
+
+    await tester.pumpWidget(appDePrueba());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Asignar Agente'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Carlos Agente Uno'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
