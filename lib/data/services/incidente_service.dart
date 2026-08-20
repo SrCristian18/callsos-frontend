@@ -107,6 +107,22 @@ abstract class IIncidenteService {
   /// `PATCH /incidentes/{id}/cancelar` — cancela el incidente
   /// (cualquier estado activo -> `CANCELADO`).
   Future<void> cancelar(String id);
+
+  /// `PATCH /incidentes/{id}/tipo` — Épica 6: el denunciante dueño
+  /// actualiza el tipo del incidente mientras la situación evoluciona
+  /// (ej. reportó `ROBOS_O_ASALTOS` y luego se convirtió en
+  /// `RIÑAS_O_PELEAS`).
+  ///
+  /// Body enviado (espejo de `ActualizarTipoIncidenteRequest`):
+  /// ```json
+  /// {"nuevoTipo": "RIÑAS_O_PELEAS"}
+  /// ```
+  /// El backend valida, en este orden (`ActualizarTipoIncidenteService`):
+  /// ownership (403 si el actor no es el denunciante dueño del
+  /// incidente), luego estado activo y tipo distinto al actual (422 —
+  /// `ApiExceptionType.businessRule` — si el incidente ya está en un
+  /// estado terminal, o si `nuevoTipo` es igual al tipo vigente).
+  Future<void> actualizarTipo(String id, TipoIncidenteEnum nuevoTipo);
 }
 
 class IncidenteService implements IIncidenteService {
@@ -212,5 +228,13 @@ class IncidenteService implements IIncidenteService {
   @override
   Future<void> cancelar(String id) async {
     await _client.patch('/incidentes/$id/cancelar');
+  }
+
+  @override
+  Future<void> actualizarTipo(String id, TipoIncidenteEnum nuevoTipo) async {
+    await _client.patch(
+      '/incidentes/$id/tipo',
+      data: {'nuevoTipo': nuevoTipo.toJson()},
+    );
   }
 }

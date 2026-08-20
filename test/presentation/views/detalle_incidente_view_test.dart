@@ -42,7 +42,9 @@ class FakeSecureStorage implements ISecureStorage {
   Future<void> delete(String key) async => _datos.remove(key);
 }
 
-Incidente _fake(String id, EstadoIncidente estado, {String? nombreCAI}) => Incidente(
+Incidente _fake(String id, EstadoIncidente estado,
+        {String? nombreCAI, String denuncianteId = 'den-001'}) =>
+    Incidente(
       id: id,
       fechaHora: DateTime(2026, 6, 14, 10, 30),
       tipo: TipoIncidenteEnum.ROBOS_O_ASALTOS,
@@ -50,7 +52,7 @@ Incidente _fake(String id, EstadoIncidente estado, {String? nombreCAI}) => Incid
       estado: estado,
       latitud: 10.391,
       longitud: -75.4794,
-      denuncianteId: 'den-001',
+      denuncianteId: denuncianteId,
       nombreCAI: nombreCAI,
     );
 
@@ -58,6 +60,14 @@ void main() {
   late MockAuthService authService;
   late MockIncidenteService incidenteService;
   late SesionViewModel sesion;
+
+  // Épica 6: `any()` para TipoIncidenteEnum (verifyNever en el test de
+  // "cerrar el selector sin elegir") requiere un fallback registrado —
+  // mismo patrón que home_denunciante_view_test.dart y
+  // crear_incidente_viewmodel_test.dart.
+  setUpAll(() {
+    registerFallbackValue(TipoIncidenteEnum.ROBOS_O_ASALTOS);
+  });
 
   Future<void> loguearComo(String actorId, Rol rol) async {
     when(() => authService.login(username: actorId, password: '1234')).thenAnswer(
@@ -228,6 +238,147 @@ void main() {
 
     verify(() => incidenteService.cancelar('i-001')).called(1);
     expect(find.text('Emergencia cancelada.'), findsOneWidget);
+  });
+
+  // Épica 6 — actualizar tipo de incidente (denunciante dueño).
+  group('Actualizar tipo de incidente (Épica 6)', () {
+    testWidgets('DENUNCIANTE dueño + activo: muestra el botón "Actualizar tipo de incidente"',
+        (tester) async {
+      await loguearComo('den-001', Rol.DENUNCIANTE);
+      when(() => incidenteService.consultar('i-001'))
+          .thenAnswer((_) async => _fake('i-001', EstadoIncidente.CREADO));
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Actualizar tipo de incidente'), findsOneWidget);
+    });
+
+    testWidgets(
+        'DENUNCIANTE NO dueño (otro denunciante): NO muestra el botón, aunque el incidente esté activo',
+        (tester) async {
+      await loguearComo('den-999-otro', Rol.DENUNCIANTE);
+      when(() => incidenteService.consultar('i-001')).thenAnswer((_) async =>
+          _fake('i-001', EstadoIncidente.CREADO, denuncianteId: 'den-001'));
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Actualizar tipo de incidente'), findsNothing);
+    });
+
+    testWidgets('DENUNCIANTE dueño + FINALIZADO (no activo): NO muestra el botón',
+        (tester) async {
+      await loguearComo('den-001', Rol.DENUNCIANTE);
+      when(() => incidenteService.consultar('i-001'))
+          .thenAnswer((_) async => _fake('i-001', EstadoIncidente.FINALIZADO));
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Actualizar tipo de incidente'), findsNothing);
+    });
+
+    testWidgets('rol distinto de DENUNCIANTE (ej. AGENTE): NO muestra el botón',
+        (tester) async {
+      await loguearComo('ag-001', Rol.AGENTE);
+      when(() => incidenteService.consultar('i-001')).thenAnswer((_) async =>
+          _fake('i-001', EstadoIncidente.AGENTE_ASIGNADO, denuncianteId: 'den-001'));
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Actualizar tipo de incidente'), findsNothing);
+    });
+
+    testWidgets(
+        'tocar el botón abre el selector sin el tipo actual (ROBOS_O_ASALTOS) entre las opciones',
+        (tester) async {
+      await loguearComo('den-001', Rol.DENUNCIANTE);
+      when(() => incidenteService.consultar('i-001'))
+          .thenAnswer((_) async => _fake('i-001', EstadoIncidente.CREADO));
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.textContaining('Actualizar tipo de incidente'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Riñas o peleas'), findsOneWidget);
+      expect(find.text('Atentados'), findsOneWidget);
+      // El tipo actual del incidente (Robos o asaltos) no debe ofrecerse
+      // como opción — aparece una sola vez, en el AppBar/card, no en la lista.
+      expect(find.text('Robos o asaltos'), findsWidgets);
+      expect(find.byType(ListTile), findsNWidgets(6)); // 7 tipos - 1 (el actual)
+    });
+
+    testWidgets(
+        'elegir un tipo en el selector llama actualizarTipo(), muestra snackbar y refresca',
+        (tester) async {
+      await loguearComo('den-001', Rol.DENUNCIANTE);
+      when(() => incidenteService.consultar('i-001'))
+          .thenAnswer((_) async => _fake('i-001', EstadoIncidente.CREADO));
+      when(() => incidenteService.actualizarTipo('i-001', TipoIncidenteEnum.RINAS_O_PELEAS))
+          .thenAnswer((_) async {});
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.textContaining('Actualizar tipo de incidente'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Riñas o peleas'));
+      await tester.pumpAndSettle();
+
+      verify(() => incidenteService.actualizarTipo('i-001', TipoIncidenteEnum.RINAS_O_PELEAS))
+          .called(1);
+      verify(() => incidenteService.consultar('i-001')).called(2); // carga inicial + refresco
+      expect(find.text('Tipo de incidente actualizado.'), findsOneWidget);
+    });
+
+    testWidgets('cerrar el selector sin elegir (deslizar hacia abajo) NO llama actualizarTipo',
+        (tester) async {
+      await loguearComo('den-001', Rol.DENUNCIANTE);
+      when(() => incidenteService.consultar('i-001'))
+          .thenAnswer((_) async => _fake('i-001', EstadoIncidente.CREADO));
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.textContaining('Actualizar tipo de incidente'));
+      await tester.pumpAndSettle();
+
+      // Cerrar tocando fuera del modal (barrera del bottom sheet).
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => incidenteService.actualizarTipo(any(), any()));
+    });
+
+    testWidgets(
+        'ApiException 403 (no dueño, verificado server-side) muestra el error sin romper la vista',
+        (tester) async {
+      await loguearComo('den-001', Rol.DENUNCIANTE);
+      when(() => incidenteService.consultar('i-001'))
+          .thenAnswer((_) async => _fake('i-001', EstadoIncidente.CREADO));
+      when(() => incidenteService.actualizarTipo('i-001', TipoIncidenteEnum.RINAS_O_PELEAS))
+          .thenThrow(const ApiException(
+        type: ApiExceptionType.forbidden,
+        statusCode: 403,
+        message: 'El denunciante autenticado no es el dueño de este incidente.',
+      ));
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.textContaining('Actualizar tipo de incidente'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Riñas o peleas'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('El denunciante autenticado no es el dueño de este incidente.'),
+          findsOneWidget);
+    });
   });
 
   testWidgets('incidente FINALIZADO (estado terminal): no muestra ningún botón de acción',
