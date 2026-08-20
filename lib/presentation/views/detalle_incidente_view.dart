@@ -12,6 +12,7 @@ import '../../data/services/incidente_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_snackbar.dart';
 import '../widgets/estado_chip.dart';
+import '../widgets/selector_tipo_incidente.dart';
 
 /// Detalle completo de un incidente.
 ///
@@ -22,6 +23,8 @@ import '../widgets/estado_chip.dart';
 ///
 /// Botones contextuales según rol + estado:
 /// - DENUNCIANTE + AGENTE_EN_CAMINO → "Ver agente en mapa" (→ TrackingView F.3).
+/// - DENUNCIANTE dueño + activo      → "Actualizar tipo" (Épica 6) →
+///   selector (`selector_tipo_incidente.dart`) → PATCH /{id}/tipo.
 /// - AGENTE + AGENTE_ASIGNADO       → "Ir en camino" → PATCH /{id}/en-camino.
 /// - AGENTE + AGENTE_EN_CAMINO      → "Llegué — Atender" → PATCH /{id}/atender.
 /// - AGENTE + EN_ATENCION           → "Finalizar" → PATCH /{id}/evaluar + ReporteHallazgos.
@@ -179,7 +182,7 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
+                    color: Colors.black.withValues(alpha: 0.06),
                     blurRadius: 10,
                     offset: const Offset(0, 3))
               ],
@@ -251,7 +254,7 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
           const SizedBox(height: 20),
 
           // ── Botones contextuales ────────────────────────────────────
-          if (!_enProceso) ..._botonesContextuales(inc, rol, service)
+          if (!_enProceso) ..._botonesContextuales(inc, rol, service, sesion.actorId)
           else
             const Center(
               child: Padding(
@@ -266,7 +269,7 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
   }
 
   List<Widget> _botonesContextuales(
-      Incidente inc, Rol? rol, IIncidenteService service) {
+      Incidente inc, Rol? rol, IIncidenteService service, String? actorId) {
     final botones = <Widget>[];
 
     // DENUNCIANTE + AGENTE_EN_CAMINO → ver en mapa
@@ -280,6 +283,24 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
           AppRoutes.tracking,
           arguments: {'incidenteId': inc.id},
         ),
+      ));
+    }
+
+    // DENUNCIANTE dueño + incidente activo → actualizar tipo (Épica 6).
+    // Ownership explícita (denuncianteId == actorId de la sesión), no solo
+    // el rol: esta vista puede abrirse con el id de CUALQUIER incidente
+    // (llega como argumento de ruta), y el backend además rechaza con 403
+    // a cualquier denunciante que no sea el dueño — este chequeo en la UI
+    // evita mostrar un botón que solo fallaría al confirmarlo.
+    if (rol == Rol.DENUNCIANTE &&
+        inc.denuncianteId == actorId &&
+        inc.estaActivo) {
+      if (botones.isNotEmpty) botones.add(const SizedBox(height: 10));
+      botones.add(_boton(
+        label: '✏️ Actualizar tipo de incidente',
+        color: Colors.deepPurple,
+        outlined: true,
+        onPressed: () => _actualizarTipo(inc, service),
       ));
     }
 
@@ -340,6 +361,26 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
     }
 
     return botones;
+  }
+
+  /// Épica 6: abre el selector de tipo y, si el denunciante elige uno,
+  /// ejecuta la actualización (elegir una opción del selector ES el
+  /// gesto de confirmación — ver `selector_tipo_incidente.dart`).
+  ///
+  /// Reutiliza `_ejecutar` (igual que el resto de acciones de esta
+  /// vista): maneja `_enProceso`, `ApiException`, y refresca `_incidente`
+  /// tras el éxito para que la card principal muestre el tipo nuevo.
+  Future<void> _actualizarTipo(Incidente inc, IIncidenteService service) async {
+    final nuevoTipo = await mostrarSelectorTipoIncidente(
+      context,
+      tipoActual: inc.tipo,
+    );
+    if (nuevoTipo == null || !mounted) return;
+
+    await _ejecutar(
+      () => service.actualizarTipo(inc.id, nuevoTipo),
+      mensajeExito: 'Tipo de incidente actualizado.',
+    );
   }
 
   Widget _boton({

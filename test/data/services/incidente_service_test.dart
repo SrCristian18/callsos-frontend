@@ -227,4 +227,63 @@ void main() {
       );
     });
   });
+
+  group('actualizarTipo (Épica 6)', () {
+    test('envía {"nuevoTipo": ...} (espejo de ActualizarTipoIncidenteRequest)', () async {
+      when(() => client.patch('/incidentes/inc-001/tipo', data: any(named: 'data')))
+          .thenAnswer((_) async => null);
+
+      await service.actualizarTipo('inc-001', TipoIncidenteEnum.ROBOS_O_ASALTOS);
+
+      verify(() => client.patch('/incidentes/inc-001/tipo', data: {'nuevoTipo': 'ROBOS_O_ASALTOS'}))
+          .called(1);
+    });
+
+    test('con tipo RIÑAS_O_PELEAS envía el string correcto con Ñ', () async {
+      when(() => client.patch('/incidentes/inc-001/tipo', data: any(named: 'data')))
+          .thenAnswer((_) async => null);
+
+      await service.actualizarTipo('inc-001', TipoIncidenteEnum.RINAS_O_PELEAS);
+
+      final captured = verify(() =>
+              client.patch('/incidentes/inc-001/tipo', data: captureAny(named: 'data')))
+          .captured
+          .single as Map<String, dynamic>;
+
+      expect(captured['nuevoTipo'], 'RIÑAS_O_PELEAS');
+    });
+
+    test('propaga ApiException 403 forbidden si el actor no es el dueño', () async {
+      when(() => client.patch('/incidentes/inc-001/tipo', data: any(named: 'data')))
+          .thenThrow(const ApiException(
+        type: ApiExceptionType.forbidden,
+        statusCode: 403,
+        message: 'El denunciante autenticado no es el dueño de este incidente.',
+      ));
+
+      await expectLater(
+        service.actualizarTipo('inc-001', TipoIncidenteEnum.RINAS_O_PELEAS),
+        throwsA(
+          isA<ApiException>().having((e) => e.type, 'type', ApiExceptionType.forbidden),
+        ),
+      );
+    });
+
+    test('propaga ApiException 422 businessRule si es el mismo tipo o el incidente ya cerró',
+        () async {
+      when(() => client.patch('/incidentes/inc-001/tipo', data: any(named: 'data')))
+          .thenThrow(const ApiException(
+        type: ApiExceptionType.businessRule,
+        statusCode: 422,
+        message: 'El incidente ya tiene ese tipo.',
+      ));
+
+      await expectLater(
+        service.actualizarTipo('inc-001', TipoIncidenteEnum.ROBOS_O_ASALTOS),
+        throwsA(
+          isA<ApiException>().having((e) => e.type, 'type', ApiExceptionType.businessRule),
+        ),
+      );
+    });
+  });
 }

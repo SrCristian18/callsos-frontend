@@ -245,6 +245,7 @@ class _BottomSheetCrearIncidenteState
                         ),
                         IconButton(
                           icon: const Icon(Icons.close),
+                          tooltip: 'Cerrar, sin reportar emergencia',
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
