@@ -304,8 +304,18 @@ void main() {
       await tester.tap(find.textContaining('Actualizar tipo de incidente'));
       await tester.pumpAndSettle();
 
+      // Defensivo: si el catálogo de tipos crece, o el sheet vuelve a
+      // necesitar scroll interno por cualquier motivo, ensureVisible()
+      // scrollea el ListView hasta el ítem antes de aserir/tocar sobre
+      // él — evita que este test vuelva a romperse por un ítem fuera
+      // del viewport (la causa raíz real ya se corrigió en
+      // selector_tipo_incidente.dart con isScrollControlled: true).
+      final finderAtentados = find.text('Atentados');
+      await tester.ensureVisible(finderAtentados);
+      await tester.pumpAndSettle();
+
       expect(find.text('Riñas o peleas'), findsOneWidget);
-      expect(find.text('Atentados'), findsOneWidget);
+      expect(finderAtentados, findsOneWidget);
       // El tipo actual del incidente (Robos o asaltos) no debe ofrecerse
       // como opción — aparece una sola vez, en el AppBar/card, no en la lista.
       expect(find.text('Robos o asaltos'), findsWidgets);
@@ -327,7 +337,10 @@ void main() {
       await tester.tap(find.textContaining('Actualizar tipo de incidente'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Riñas o peleas'));
+      final finderRinas = find.text('Riñas o peleas');
+      await tester.ensureVisible(finderRinas);
+      await tester.pumpAndSettle();
+      await tester.tap(finderRinas);
       await tester.pumpAndSettle();
 
       verify(() => incidenteService.actualizarTipo('i-001', TipoIncidenteEnum.RINAS_O_PELEAS))
@@ -373,7 +386,10 @@ void main() {
 
       await tester.tap(find.textContaining('Actualizar tipo de incidente'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Riñas o peleas'));
+      final finderRinas403 = find.text('Riñas o peleas');
+      await tester.ensureVisible(finderRinas403);
+      await tester.pumpAndSettle();
+      await tester.tap(finderRinas403);
       await tester.pumpAndSettle();
 
       expect(find.text('El denunciante autenticado no es el dueño de este incidente.'),

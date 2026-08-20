@@ -45,9 +45,29 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
 
   late String _incidenteId;
 
+  /// FIX: sin esta guarda, `_cargar()` se disparaba en cada
+  /// `didChangeDependencies()` — y ese método NO se llama una sola vez.
+  /// Flutter lo vuelve a invocar cada vez que cambia una dependencia de
+  /// InheritedWidget, y `ModalRoute.of(context)` es una de esas
+  /// dependencias: cuando esta vista deja de ser la ruta activa (ej. se
+  /// abre `mostrarSelectorTipoIncidente`, que internamente hace
+  /// `Navigator.push` de su propia ruta) y cuando vuelve a serlo (se
+  /// cierra el selector), `isCurrent` cambia en ambos sentidos y dispara
+  /// `didChangeDependencies()` de nuevo — 2 disparos extra por cada
+  /// apertura/cierre de CUALQUIER modal sobre esta vista, sin relación
+  /// con el argumento de ruta (`incidenteId`), que no cambió.
+  /// `_incidenteId` sí necesita leerse de `ModalRoute.of(context)` en
+  /// `didChangeDependencies()` (no en `initState()`, porque ahí el
+  /// contexto todavía no tiene acceso a los InheritedWidgets de rutas),
+  /// pero la CARGA (`_cargar()`) solo debe dispararse la primera vez.
+  bool _yaCargado = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_yaCargado) return;
+    _yaCargado = true;
+
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     _incidenteId = args?['incidenteId'] as String? ?? '';

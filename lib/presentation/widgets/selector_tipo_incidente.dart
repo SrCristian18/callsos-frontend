@@ -32,6 +32,18 @@ Future<TipoIncidenteEnum?> mostrarSelectorTipoIncidente(
 
   return showModalBottomSheet<TipoIncidenteEnum>(
     context: context,
+    // FIX: sin isScrollControlled (default false), Flutter limita el alto
+    // del sheet a 9/16 de la pantalla (_ModalBottomSheetLayout). Con 6
+    // opciones + header eso no alcanza en viewports chicos (ej. el test
+    // widget usa 800x600 → cap de ~337px, pero 6 ListTile + header piden
+    // ~514px) — los ítems que caen fuera del cap ni se construyen en el
+    // árbol (SliverList solo materializa lo que entra en viewport +
+    // cacheExtent), y el último ítem visible queda al borde exacto,
+    // rompiendo el hit-test por unos pocos píxeles. isScrollControlled:
+    // true saca ese cap de 9/16 y deja que el sheet crezca hasta el alto
+    // real de su contenido (limitado por maxHeight de abajo), evitando
+    // el problema por completo en vez de parchearlo con scroll forzado.
+    isScrollControlled: true,
     backgroundColor: Colors.white,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
