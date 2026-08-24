@@ -1,5 +1,40 @@
 # CallSOS — Deuda de Backend (F.0.7)
 
+> ## ⚠️ ESTADO ACTUAL (actualizado en validación end-to-end / Épica 8): LOS 4 GAPS YA ESTÁN RESUELTOS
+>
+> Este documento se dejó intacto por valor histórico (documenta las decisiones de
+> producto tomadas mientras cada gap estuvo abierto — útil para entender POR QUÉ
+> ciertas pantallas se diseñaron como se diseñaron), pero **ya no refleja el
+> estado real del sistema**. Verificado contra el código real en `dev` (ambos
+> repos) en esta fecha:
+>
+> | Gap | Estado | Evidencia |
+> |---|---|---|
+> | 1 — Registro | ✅ Resuelto | `AuthController` (`/auth/registro/denunciante`, `/auth/registro/agente` con token de invitación) + `RegisterDenuncianteView`/`RegisterPoliciaView` ya conectadas vía `SesionViewModel.registrarDenunciante`/`registrarAgente` |
+> | 2 — Catálogo CAIs / listado Comando | ✅ Resuelto (la parte urgente) | `GET /incidentes/por-estado?estado=CREADO` (`ConsultarIncidentesPorEstadoService`) + `HomeComandoView` ya lo consume vía `service.porEstado(...)`. El catálogo de candidatos (`GET /cais/candidatos`) sigue sin existir, pero nunca fue el bloqueante real — sigue la asignación automática al CAI más cercano |
+> | 3 — Agentes disponibles | ✅ Resuelto | `GET /cais/{caiId}/agentes/disponibles` + `HomeCAIView` ya lo consume vía `caiService.agentesDisponibles(...)` |
+> | 4 — Perfil/nombre | ✅ Resuelto | `usuarios.nombre` (`05_perfil_usuario.sql`) + `AuthResponse.nombre` + `AuthResult.nombre` (Flutter) |
+>
+> **Sub-gap nuevo, menor, NO documentado originalmente aquí:** el tab
+> "Delegados" de `HomeComandoView` (historial de incidentes ya derivados)
+> todavía muestra un placeholder — no hay endpoint para listar incidentes por
+> más de un estado a la vez ni un historial agregado para Comando. Ver el
+> comentario en `home_comando_view.dart` línea ~277. Menor: Comando puede
+> igual ver cualquier incidente derivado desde su detalle. No bloqueante.
+>
+> **Nota operativa importante encontrada en esta misma revisión:** las
+> migraciones `05_perfil_usuario.sql`, `06_epica2_auditoria_generica.sql` y
+> `07_epica5_token_fcm_agente_cai.sql` son `ALTER TABLE`, NO parte de
+> `01_schema.sql`. Como `docker-compose.yml` monta `database/` en
+> `/docker-entrypoint-initdb.d` sobre un volumen con nombre persistente
+> (`mysql_data`), MySQL **solo las ejecuta la primera vez que el volumen está
+> vacío** — cualquier entorno local levantado ANTES de que estos 3 scripts
+> existieran necesita correrlos a mano (o recrear el volumen) o el login
+> falla con 500 para todos los roles (`usuarios.nombre` no existe todavía).
+>
+> El resto del documento se conserva sin cambios, tal como se escribió
+> cuando estos gaps estaban abiertos.
+
 > **Contexto:** el backend no se modificará hasta que el frontend esté completo
 > en gran medida. Este documento registra los 4 gaps conocidos entre lo que el
 > frontend necesitará y lo que el backend expone hoy, para que cada fase
