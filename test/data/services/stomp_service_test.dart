@@ -381,13 +381,20 @@ void main() {
     test('suscribirUbicacionAgente se suscribe a /topic/agente/{agenteId}/ubicacion',
         () async {
       final service = crearServicio();
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+
+      // FIX: mockClient se reasigna DENTRO de creadorCliente, que solo
+      // se ejecuta al llamar conectar() — estubear antes de conectar()
+      // registra el stub sobre la instancia del test ANTERIOR (o una
+      // sin inicializar), no sobre la fresca de este test. Con send()
+      // (void) esto pasaba desapercibido; con subscribe() (retorno no
+      // nulo) explota con "type 'Null' is not a subtype of...".
       when(() => mockClient.subscribe(
             destination: any(named: 'destination'),
             callback: any(named: 'callback'),
           )).thenReturn(({Map<String, String>? unsubscribeHeaders}) {});
-
-      await service.conectar(onConnected: () {}, onError: (_) {});
-      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
 
       service.suscribirUbicacionAgente(agenteId: 'ag-001', onMensaje: (_) {});
 
@@ -401,6 +408,10 @@ void main() {
     test('suscribirUbicacionAgente decodifica el frame recibido y lo pasa a onMensaje',
         () async {
       final service = crearServicio();
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+
       void Function(StompFrame)? callbackCapturado;
       when(() => mockClient.subscribe(
             destination: any(named: 'destination'),
@@ -410,9 +421,6 @@ void main() {
             invocacion.namedArguments[#callback] as void Function(StompFrame);
         return ({Map<String, String>? unsubscribeHeaders}) {};
       });
-
-      await service.conectar(onConnected: () {}, onError: (_) {});
-      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
 
       UbicacionMensaje? recibido;
       service.suscribirUbicacionAgente(
@@ -436,13 +444,14 @@ void main() {
     test('suscribirEta se suscribe a /topic/incidente/{incidenteId}/eta',
         () async {
       final service = crearServicio();
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+
       when(() => mockClient.subscribe(
             destination: any(named: 'destination'),
             callback: any(named: 'callback'),
           )).thenReturn(({Map<String, String>? unsubscribeHeaders}) {});
-
-      await service.conectar(onConnected: () {}, onError: (_) {});
-      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
 
       service.suscribirEta(incidenteId: 'i-001', onMensaje: (_) {});
 
@@ -456,6 +465,10 @@ void main() {
     test('suscribirEta decodifica el frame recibido (incluidos valores null) y lo pasa a onMensaje',
         () async {
       final service = crearServicio();
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+
       void Function(StompFrame)? callbackCapturado;
       when(() => mockClient.subscribe(
             destination: any(named: 'destination'),
@@ -465,9 +478,6 @@ void main() {
             invocacion.namedArguments[#callback] as void Function(StompFrame);
         return ({Map<String, String>? unsubscribeHeaders}) {};
       });
-
-      await service.conectar(onConnected: () {}, onError: (_) {});
-      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
 
       EtaInfo? recibido;
       service.suscribirEta(
@@ -490,6 +500,10 @@ void main() {
     test('cancelarSuscripcion cancela tanto ubicación como ETA sin lanzar excepción',
         () async {
       final service = crearServicio();
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+
       var canceladaUbicacion = false;
       var canceladaEta = false;
       when(() => mockClient.subscribe(
@@ -501,8 +515,6 @@ void main() {
             callback: any(named: 'callback'),
           )).thenReturn(({Map<String, String>? unsubscribeHeaders}) => canceladaEta = true);
 
-      await service.conectar(onConnected: () {}, onError: (_) {});
-      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
       service.suscribirUbicacionAgente(agenteId: 'ag-001', onMensaje: (_) {});
       service.suscribirEta(incidenteId: 'i-001', onMensaje: (_) {});
 

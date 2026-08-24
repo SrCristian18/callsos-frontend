@@ -64,9 +64,15 @@ class _TrackingViewState extends State<TrackingView> {
   void initState() {
     super.initState();
     _vm = TrackingViewModel(
-      stomp: StompService(
-        tokenProvider: context.read<SesionViewModel>(),
-      ),
+      // FIX: antes se instanciaba `StompService(tokenProvider: ...)`
+      // directamente, ignorando el `IStompService` que `AppProviders`
+      // ya registra globalmente (mismo bug y mismo fix que
+      // `EtaWidget` — ver su docstring para el detalle completo:
+      // producción abría una conexión WS independiente por widget, y
+      // en tests era imposible de sustituir por un fake, lo que
+      // disparaba un Timer de reconexión real que sobrevivía al
+      // dispose del árbol de widgets).
+      stomp: context.read<IStompService>(),
       geo: context.read<IGeolocalizacionService>(),
     );
   }

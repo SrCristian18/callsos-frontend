@@ -11,48 +11,30 @@ import 'package:CallSos/data/services/auth_service.dart';
 import 'package:CallSos/data/services/geolocalizacion_service.dart';
 import 'package:CallSos/data/services/incidente_service.dart';
 import 'package:CallSos/data/services/secure_storage.dart';
+import 'package:CallSos/data/services/stomp_service.dart';
 import 'package:CallSos/presentation/viewmodels/sesion_viewmodel.dart';
 import 'package:CallSos/presentation/views/tracking_view.dart';
 
 /// Épica 5 (ruta técnica) — widget test de TrackingView.
 ///
-/// ALCANCE DELIBERADAMENTE LIMITADO — leer antes de agregar más tests
-/// aquí:
+/// FIX: `_TrackingViewState.initState()` ahora lee `IStompService` desde
+/// el Provider (`context.read<IStompService>()`) en vez de instanciar
+/// `StompService` real directamente — mismo fix aplicado a `EtaWidget`
+/// (ver su docstring). El comentario original de este archivo describía
+/// esto como una limitación conocida sin punto de inyección; ese punto
+/// de inyección ahora existe, vía `Provider<IStompService>.value(...)`
+/// en `appDePrueba()` (mismo patrón que `IIncidenteService`,
+/// `IGeolocalizacionService`, etc.).
 ///
-/// A diferencia de TODAS las demás vistas de esta épica,
-/// `_TrackingViewState.initState()` construye `StompService(...)` (la
-/// implementación REAL, no `IStompService`) directamente, sin ningún
-/// punto de inyección:
-/// ```dart
-/// _vm = TrackingViewModel(
-///   stomp: StompService(tokenProvider: context.read<SesionViewModel>()),
-///   geo: context.read<IGeolocalizacionService>(),
-/// );
-/// ```
-/// Esto es distinto de cómo se construyen CrearIncidenteViewModel,
-/// IncidenteListViewModel, ReporteHallazgosViewModel, etc. en sus vistas
-/// (todas reciben sus servicios ya resueltos desde el árbol de
-/// providers). Como consecuencia, ningún test de ESTE archivo puede
-/// dejar que `_inicializar()` llegue a `_vm.iniciar()` — eso dispararía
-/// `StompService.conectar()` real (intento de WebSocket real) dentro del
-/// test, con riesgo de timers pendientes y tests lentos/flaky.
-///
-/// La lógica que sí depende de STOMP (estados de conexión, actualización
-/// de posición, reconexión) YA está cubierta exhaustivamente y de forma
-/// segura en `tracking_viewmodel_test.dart`, donde `TrackingViewModel`
-/// SÍ recibe un `IStompService` inyectado. Este archivo cubre solo lo
-/// que es seguro probar sin tocar esa dependencia: el flujo de carga del
-/// incidente ANTES de que se invoque `_vm.iniciar()` — que en el código
-/// solo ocurre si `consultar()` tiene éxito. El camino de error de
-/// `consultar()` retorna antes (`return` explícito en el `catch`), así
-/// que es 100% seguro.
-///
-/// Si se necesita cobertura completa del flujo feliz de TrackingView
-/// (mapa + marcadores + posición en tiempo real), el prerrequisito es
-/// refactorizar `initState()` para aceptar un `IStompService` inyectable
-/// (mismo patrón que ya tiene `StompService.creadorCliente` un nivel más
-/// abajo) — cambio de código de producción que no se hizo aquí por no
-/// ser parte del alcance pedido (solo tests).
+/// ALCANCE TODAVÍA LIMITADO: el desbloqueo de arriba resuelve el riesgo
+/// de Timers/WebSocket real colgando el test runner, pero los tests de
+/// ESTE archivo siguen sin ejercitar el camino feliz completo (mapa +
+/// marcadores + posición en tiempo real) — eso ya está cubierto
+/// exhaustivamente en `tracking_viewmodel_test.dart` (que inyecta
+/// `IStompService` directamente en `TrackingViewModel`, sin pasar por
+/// widgets). Ampliar la cobertura de ESTE archivo al camino feliz
+/// (`FlutterMap`, marcadores, `_ConexionIndicador`) queda como trabajo
+/// futuro — no forma parte de este fix.
 ///
 /// Épica 7: los argumentos de ruta ahora requieren `agenteId` además de
 /// `incidenteId` — sin él, la vista muestra un error dedicado y NUNCA
@@ -62,6 +44,10 @@ class MockAuthService extends Mock implements IAuthService {}
 class MockIncidenteService extends Mock implements IIncidenteService {}
 
 class MockGeolocalizacionService extends Mock implements IGeolocalizacionService {}
+
+/// Mismo mock/patrón que `detalle_incidente_view_test.dart` — ver ahí
+/// para el detalle completo del fix que lo hizo necesario.
+class MockStompService extends Mock implements IStompService {}
 
 class FakeSecureStorage implements ISecureStorage {
   final Map<String, String> _datos = {};
@@ -77,6 +63,7 @@ void main() {
   late MockAuthService authService;
   late MockIncidenteService incidenteService;
   late MockGeolocalizacionService geoService;
+  late MockStompService stompService;
   late SesionViewModel sesion;
 
   setUp(() async {
@@ -84,6 +71,19 @@ void main() {
     incidenteService = MockIncidenteService();
     geoService = MockGeolocalizacionService();
     sesion = SesionViewModel(authService: authService, storage: FakeSecureStorage());
+
+    // Necesario ahora que TrackingView lee IStompService desde el
+    // Provider en initState() — se ejecuta en TODOS los tests de este
+    // archivo (aunque ninguno llegue a _vm.iniciar(), initState() sí
+    // corre siempre al montar el widget). conectar()/desconectar() no
+    // necesitan más comportamiento que "no lanzar" para los tests
+    // actuales (que nunca llegan a invocarlos de verdad).
+    stompService = MockStompService();
+    when(() => stompService.conectar(
+          onConnected: any(named: 'onConnected'),
+          onError: any(named: 'onError'),
+        )).thenAnswer((_) async {});
+    when(() => stompService.desconectar()).thenAnswer((_) async {});
 
     // Épica 7: DENUNCIANTE ya no accede a TrackingView (bloqueado por
     // RouteGuard antes de llegar acá) — se loguea como AGENTE para que
@@ -102,6 +102,7 @@ void main() {
       providers: [
         Provider<IIncidenteService>.value(value: incidenteService),
         Provider<IGeolocalizacionService>.value(value: geoService),
+        Provider<IStompService>.value(value: stompService),
         ChangeNotifierProvider<SesionViewModel>.value(value: sesion),
       ],
       child: MaterialApp(
@@ -250,6 +251,7 @@ void main() {
           providers: [
             Provider<IIncidenteService>.value(value: incidenteService),
             Provider<IGeolocalizacionService>.value(value: geoService),
+            Provider<IStompService>.value(value: stompService),
             ChangeNotifierProvider<SesionViewModel>.value(value: sesion),
           ],
           child: MaterialApp(

@@ -48,8 +48,15 @@ enum TrackingConexionEstado {
 /// vm.iniciar(incidenteId: id, agenteId: agenteId, rol: sesion.rol!,
 ///            actorId: sesion.actorId!, posicionInicial: Ubicacion(lat, lon));
 /// // dispose:
-/// vm.detener();
+/// vm.dispose();
 /// ```
+/// `dispose()` YA cancela la suscripción GPS y desconecta el WS por sí
+/// solo (fire-and-forget, sin disparar `notifyListeners`) — no hace
+/// falta llamar a [detener] antes. Igual que en `EtaViewModel`,
+/// encadenar `vm.detener(); vm.dispose();` en `State.dispose()` (que no
+/// es async) es un bug: el `await` interno de `detener()` puede resolver
+/// después de que `dispose()` ya destruyó el ChangeNotifier, y su
+/// `notifyListeners()` final explota con "used after being disposed".
 class TrackingViewModel extends ChangeNotifier {
   final IStompService _stomp;
   final IGeolocalizacionService _geo;

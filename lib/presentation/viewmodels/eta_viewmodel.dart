@@ -27,9 +27,19 @@ enum EtaConexionEstado { desconectado, conectando, conectado, error }
 /// // initState:
 /// vm.iniciar(incidenteId);
 /// // dispose:
-/// vm.detener();
 /// vm.dispose();
 /// ```
+/// `dispose()` YA desconecta el WS por sí solo (fire-and-forget, sin
+/// disparar `notifyListeners`) — no hace falta llamar a [detener] antes.
+/// [detener] existe como operación explícita e independiente ("dejar de
+/// escuchar ETA sin destruir el ViewModel", ej. si en el futuro se
+/// quisiera pausar/reanudar), pero NUNCA debe encadenarse justo antes de
+/// `dispose()`: al ser async y no poder esperarse dentro de
+/// `State.dispose()` (que no es async), su `await
+/// _stomp.desconectar()` puede resolver DESPUÉS de que `dispose()` ya
+/// marcó el ChangeNotifier como destruido, y el `notifyListeners()` de
+/// `detener()` explota con "used after being disposed" — bug real que
+/// tuvo `EtaWidget` antes de este fix.
 class EtaViewModel extends ChangeNotifier {
   final IStompService _stomp;
   final IIncidenteService _incidenteService;

@@ -13,6 +13,7 @@ import 'package:CallSos/data/services/api_exception.dart';
 import 'package:CallSos/data/services/auth_service.dart';
 import 'package:CallSos/data/services/incidente_service.dart';
 import 'package:CallSos/data/services/secure_storage.dart';
+import 'package:CallSos/data/services/stomp_service.dart';
 import 'package:CallSos/presentation/viewmodels/sesion_viewmodel.dart';
 import 'package:CallSos/presentation/views/detalle_incidente_view.dart';
 
@@ -31,6 +32,14 @@ import 'package:CallSos/presentation/views/detalle_incidente_view.dart';
 class MockAuthService extends Mock implements IAuthService {}
 
 class MockIncidenteService extends Mock implements IIncidenteService {}
+
+/// FIX: `EtaWidget` ahora lee `IStompService` desde el Provider
+/// (`context.read<IStompService>()`) en vez de instanciar `StompService`
+/// real directamente — ver el docstring de `eta_widget.dart`. Este mock
+/// es lo que hace posible sustituir esa conexión en el test de abajo sin
+/// disparar un WebSocket real ni dejar un Timer pendiente tras el
+/// dispose del árbol de widgets.
+class MockStompService extends Mock implements IStompService {}
 
 class FakeSecureStorage implements ISecureStorage {
   final Map<String, String> _datos = {};
@@ -62,6 +71,7 @@ Incidente _fake(String id, EstadoIncidente estado,
 void main() {
   late MockAuthService authService;
   late MockIncidenteService incidenteService;
+  late MockStompService stompService;
   late SesionViewModel sesion;
 
   // Épica 6: `any()` para TipoIncidenteEnum (verifyNever en el test de
@@ -83,12 +93,25 @@ void main() {
     authService = MockAuthService();
     incidenteService = MockIncidenteService();
     sesion = SesionViewModel(authService: authService, storage: FakeSecureStorage());
+
+    // Stubs mínimos para que EtaWidget (si llega a montarse — solo
+    // ocurre con DENUNCIANTE + AGENTE_EN_CAMINO) no reciba llamadas sin
+    // estubear. conectar() nunca invoca onConnected/onError aquí — el
+    // test de ETA no depende de llegar a estado "conectado", solo de
+    // que el widget se construya sin lanzar una conexión WS real.
+    stompService = MockStompService();
+    when(() => stompService.conectar(
+          onConnected: any(named: 'onConnected'),
+          onError: any(named: 'onError'),
+        )).thenAnswer((_) async {});
+    when(() => stompService.desconectar()).thenAnswer((_) async {});
   });
 
   Widget appDePrueba({required String incidenteId}) {
     return MultiProvider(
       providers: [
         Provider<IIncidenteService>.value(value: incidenteService),
+        Provider<IStompService>.value(value: stompService),
         ChangeNotifierProvider<SesionViewModel>.value(value: sesion),
       ],
       child: MaterialApp(
@@ -162,22 +185,20 @@ void main() {
   testWidgets(
       'DENUNCIANTE + AGENTE_EN_CAMINO: muestra el widget de ETA (Épica 7) '
       'en vez del antiguo botón "Ver agente en mapa"', (tester) async {
-    // ADVERTENCIA (mismo patrón documentado en tracking_view_test.dart):
-    // EtaWidget crea su propio StompService REAL en initState() y
-    // dispara conectar() de inmediato — sin punto de inyección en esta
-    // vista. Por eso este test usa pump() acotado, NUNCA pumpAndSettle(),
-    // para no esperar a que un intento de conexión WebSocket real
-    // (que fallará/reintentará en el entorno de test) se resuelva.
     await loguearComo('den-001', Rol.DENUNCIANTE);
     when(() => incidenteService.consultar('i-001'))
         .thenAnswer((_) async => _fake('i-001', EstadoIncidente.AGENTE_EN_CAMINO));
 
     await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
-    await tester.pump(); // resuelve el FutureBuilder de consultar()
-    await tester.pump(); // deja construir el árbol tras setState()
+    await tester.pumpAndSettle();
 
     expect(find.text('Tiempo estimado de llegada'), findsOneWidget);
     expect(find.textContaining('Ver agente en mapa'), findsNothing);
+
+    verify(() => stompService.conectar(
+          onConnected: any(named: 'onConnected'),
+          onError: any(named: 'onError'),
+        )).called(1);
   });
 
   testWidgets(

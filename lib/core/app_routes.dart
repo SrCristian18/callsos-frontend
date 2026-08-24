@@ -145,7 +145,7 @@ class AppRoutes {
                                     child: DetalleIncidenteView(),
                                   ),
     tracking:             (_) => const RouteGuard(
-                                    rolesPermitidos: _cualquierRolAutenticado,
+                                    rolesPermitidos: _rolesTracking,
                                     child: TrackingView(),
                                   ),
     reporteHallazgos:     (_) => const RouteGuard(
