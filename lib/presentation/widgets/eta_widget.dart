@@ -5,7 +5,6 @@ import '../../core/colores_app.dart';
 import '../../data/services/incidente_service.dart';
 import '../../data/services/stomp_service.dart';
 import '../viewmodels/eta_viewmodel.dart';
-import '../viewmodels/sesion_viewmodel.dart';
 
 /// Tarjeta que muestra el tiempo estimado de llegada del agente.
 ///
@@ -15,10 +14,28 @@ import '../viewmodels/sesion_viewmodel.dart';
 /// siquiera indirectamente (esta tarjeta jamás recibe lat/lon — ver
 /// `EtaInfo`, que por diseño no tiene esos campos).
 ///
-/// Autocontenido: gestiona su propio [EtaViewModel] y conexión STOMP,
-/// igual que [TrackingView] gestiona la suya — se conecta en
-/// `initState` y se desconecta en `dispose`, sin que el widget padre
-/// ([DetalleIncidenteView]) necesite saber nada de STOMP.
+/// Autocontenido: gestiona su propio [EtaViewModel], pero la conexión
+/// STOMP en sí es la MISMA instancia compartida que usa el resto de la
+/// app (ver `AppProviders` — `ProxyProvider<SesionViewModel, IStompService>`).
+///
+/// FIX: antes este widget instanciaba `StompService(tokenProvider: ...)`
+/// directamente en `initState()`, ignorando el `IStompService` que
+/// `AppProviders` YA registra globalmente para exactamente este
+/// propósito. Dos problemas con eso, uno de producción y uno de tests:
+///   1. Cada vez que se montaba este widget se abría una conexión
+///      WebSocket NUEVA e independiente, en vez de reutilizar la del
+///      resto de la app.
+///   2. Ningún test podía sustituirla por un fake — cualquier test que
+///      montara este widget disparaba un intento de conexión WebSocket
+///      REAL, con su Timer de reconexión interno (`stomp_dart_client`)
+///      que seguía pendiente incluso después de que Flutter Test
+///      destruyera el árbol de widgets ("A Timer is still pending even
+///      after the widget tree was disposed").
+///
+/// `context.read<IStompService>()` sí puede sustituirse en tests por un
+/// fake/mock vía `Provider<IStompService>.value(...)` — mismo patrón
+/// que ya usan `IIncidenteService`, `SesionViewModel`, etc. en toda la
+/// app.
 ///
 /// Se muestra solo cuando el incidente está en `AGENTE_EN_CAMINO` (ver
 /// `_botonesContextuales` en `DetalleIncidenteView`) — antes de eso no
@@ -39,9 +56,7 @@ class _EtaWidgetState extends State<EtaWidget> {
   void initState() {
     super.initState();
     _vm = EtaViewModel(
-      stomp: StompService(
-        tokenProvider: context.read<SesionViewModel>(),
-      ),
+      stomp: context.read<IStompService>(),
       incidenteService: context.read<IIncidenteService>(),
     );
     _vm.iniciar(widget.incidenteId);
@@ -49,7 +64,17 @@ class _EtaWidgetState extends State<EtaWidget> {
 
   @override
   void dispose() {
-    _vm.detener();
+    // FIX: llamar aquí a `_vm.detener()` (async, sin await — dispose()
+    // de State no puede ser async) seguido inmediatamente de
+    // `_vm.dispose()` provocaba una carrera: cuando el `await
+    // _stomp.desconectar()` dentro de detener() finalmente resolvía,
+    // intentaba `_setConexion(...)` → `notifyListeners()` sobre un
+    // EtaViewModel YA destruido — "A EtaViewModel was used after being
+    // disposed". `EtaViewModel.dispose()` ya hace toda la limpieza
+    // necesaria (desconecta el WS) sin disparar notifyListeners, así
+    // que basta con llamarlo solo a él — mismo patrón que
+    // `_TrackingViewState.dispose()` (que nunca llamó a un "detener()"
+    // aparte, solo a `_vm.dispose()`).
     _vm.dispose();
     super.dispose();
   }
