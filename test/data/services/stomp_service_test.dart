@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:stomp_dart_client/stomp_dart_client.dart';
 
+import 'package:CallSos/data/models/eta_info.dart';
 import 'package:CallSos/data/services/stomp_service.dart';
 import 'package:CallSos/data/services/token_provider.dart';
 
@@ -57,7 +58,7 @@ void main() {
     });
 
     test('latitud/longitud ausentes lanza una excepción de tipo '
-        '(el llamador es responsable de capturarla — ver StompService.suscribirUbicacion)', () {
+        '(el llamador es responsable de capturarla — ver StompService.suscribirUbicacionAgente)', () {
       expect(
         () => UbicacionMensaje.fromJson({'timestamp': 't'}),
         throwsA(anything),
@@ -65,17 +66,52 @@ void main() {
     });
   });
 
-  group('StompService — contrato defensivo (seguro de llamar en cualquier orden)', () {
-    test('estaConectado empieza en false', () {
+  group('EtaInfo.fromJson', () {
+    test('parsea un payload con datos completos', () {
+      final eta = EtaInfo.fromJson({
+        'minutosEstimados': 8,
+        'categoriaDistancia': 'MENOS_DE_1_KM',
+      });
+
+      expect(eta.minutosEstimados, 8);
+      expect(eta.categoriaDistancia, CategoriaDistancia.MENOS_DE_1_KM);
+      expect(eta.tieneDatos, isTrue);
+    });
+
+    test('ambos campos null (sin datos aún) no lanza excepción', () {
+      final eta = EtaInfo.fromJson({
+        'minutosEstimados': null,
+        'categoriaDistancia': null,
+      });
+
+      expect(eta.minutosEstimados, isNull);
+      expect(eta.categoriaDistancia, isNull);
+      expect(eta.tieneDatos, isFalse);
+    });
+  });
+
+  group('StompService — contrato defensivo (seguro de llamar en cualquier orden)', () {    test('estaConectado empieza en false', () {
       final service = StompService();
       expect(service.estaConectado, isFalse);
     });
 
-    test('suscribirUbicacion antes de conectar() no lanza excepción (no-op)', () {
+    test('suscribirUbicacionAgente antes de conectar() no lanza excepción (no-op)', () {
       final service = StompService();
 
       expect(
-        () => service.suscribirUbicacion(
+        () => service.suscribirUbicacionAgente(
+          agenteId: 'ag-001',
+          onMensaje: (_) {},
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('suscribirEta antes de conectar() no lanza excepción (no-op)', () {
+      final service = StompService();
+
+      expect(
+        () => service.suscribirEta(
           incidenteId: 'i-001',
           onMensaje: (_) {},
         ),
@@ -340,6 +376,140 @@ void main() {
 
       verify(() => mockClient.deactivate()).called(1);
       expect(service.estaConectado, isFalse);
+    });
+
+    test('suscribirUbicacionAgente se suscribe a /topic/agente/{agenteId}/ubicacion',
+        () async {
+      final service = crearServicio();
+      when(() => mockClient.subscribe(
+            destination: any(named: 'destination'),
+            callback: any(named: 'callback'),
+          )).thenReturn(({Map<String, String>? unsubscribeHeaders}) {});
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+
+      service.suscribirUbicacionAgente(agenteId: 'ag-001', onMensaje: (_) {});
+
+      final captura = verify(() => mockClient.subscribe(
+            destination: captureAny(named: 'destination'),
+            callback: any(named: 'callback'),
+          )).captured;
+      expect(captura.single, '/topic/agente/ag-001/ubicacion');
+    });
+
+    test('suscribirUbicacionAgente decodifica el frame recibido y lo pasa a onMensaje',
+        () async {
+      final service = crearServicio();
+      void Function(StompFrame)? callbackCapturado;
+      when(() => mockClient.subscribe(
+            destination: any(named: 'destination'),
+            callback: any(named: 'callback'),
+          )).thenAnswer((invocacion) {
+        callbackCapturado =
+            invocacion.namedArguments[#callback] as void Function(StompFrame);
+        return ({Map<String, String>? unsubscribeHeaders}) {};
+      });
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+
+      UbicacionMensaje? recibido;
+      service.suscribirUbicacionAgente(
+        agenteId: 'ag-001',
+        onMensaje: (m) => recibido = m,
+      );
+
+      callbackCapturado!(StompFrame(
+        command: 'MESSAGE',
+        body: jsonEncode({
+          'latitud': 10.4,
+          'longitud': -75.5,
+          'timestamp': '2026-01-01T10:00:00',
+        }),
+      ));
+
+      expect(recibido?.latitud, 10.4);
+      expect(recibido?.longitud, -75.5);
+    });
+
+    test('suscribirEta se suscribe a /topic/incidente/{incidenteId}/eta',
+        () async {
+      final service = crearServicio();
+      when(() => mockClient.subscribe(
+            destination: any(named: 'destination'),
+            callback: any(named: 'callback'),
+          )).thenReturn(({Map<String, String>? unsubscribeHeaders}) {});
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+
+      service.suscribirEta(incidenteId: 'i-001', onMensaje: (_) {});
+
+      final captura = verify(() => mockClient.subscribe(
+            destination: captureAny(named: 'destination'),
+            callback: any(named: 'callback'),
+          )).captured;
+      expect(captura.single, '/topic/incidente/i-001/eta');
+    });
+
+    test('suscribirEta decodifica el frame recibido (incluidos valores null) y lo pasa a onMensaje',
+        () async {
+      final service = crearServicio();
+      void Function(StompFrame)? callbackCapturado;
+      when(() => mockClient.subscribe(
+            destination: any(named: 'destination'),
+            callback: any(named: 'callback'),
+          )).thenAnswer((invocacion) {
+        callbackCapturado =
+            invocacion.namedArguments[#callback] as void Function(StompFrame);
+        return ({Map<String, String>? unsubscribeHeaders}) {};
+      });
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+
+      EtaInfo? recibido;
+      service.suscribirEta(
+        incidenteId: 'i-001',
+        onMensaje: (m) => recibido = m,
+      );
+
+      callbackCapturado!(StompFrame(
+        command: 'MESSAGE',
+        body: jsonEncode({
+          'minutosEstimados': 5,
+          'categoriaDistancia': 'ENTRE_1_Y_3_KM',
+        }),
+      ));
+
+      expect(recibido?.minutosEstimados, 5);
+      expect(recibido?.categoriaDistancia, CategoriaDistancia.ENTRE_1_Y_3_KM);
+    });
+
+    test('cancelarSuscripcion cancela tanto ubicación como ETA sin lanzar excepción',
+        () async {
+      final service = crearServicio();
+      var canceladaUbicacion = false;
+      var canceladaEta = false;
+      when(() => mockClient.subscribe(
+            destination: '/topic/agente/ag-001/ubicacion',
+            callback: any(named: 'callback'),
+          )).thenReturn(({Map<String, String>? unsubscribeHeaders}) => canceladaUbicacion = true);
+      when(() => mockClient.subscribe(
+            destination: '/topic/incidente/i-001/eta',
+            callback: any(named: 'callback'),
+          )).thenReturn(({Map<String, String>? unsubscribeHeaders}) => canceladaEta = true);
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+      service.suscribirUbicacionAgente(agenteId: 'ag-001', onMensaje: (_) {});
+      service.suscribirEta(incidenteId: 'i-001', onMensaje: (_) {});
+
+      service.cancelarSuscripcion();
+
+      expect(canceladaUbicacion, isTrue);
+      expect(canceladaEta, isTrue);
     });
   });
 }

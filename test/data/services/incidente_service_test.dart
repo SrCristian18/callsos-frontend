@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:CallSos/data/models/enums/estado_incidente.dart';
 import 'package:CallSos/data/models/enums/tipo_incidente_enum.dart';
+import 'package:CallSos/data/models/eta_info.dart';
 import 'package:CallSos/data/models/valueobject/ubicacion.dart';
 import 'package:CallSos/data/services/api_client.dart';
 import 'package:CallSos/data/services/api_exception.dart';
@@ -283,6 +284,54 @@ void main() {
         throwsA(
           isA<ApiException>().having((e) => e.type, 'type', ApiExceptionType.businessRule),
         ),
+      );
+    });
+  });
+
+  group('consultarEta (Épica 7)', () {
+    test('GET /{id}/eta con datos completos mapea a EtaInfo', () async {
+      when(() => client.get('/incidentes/inc-001/eta')).thenAnswer(
+        (_) async => {
+          'minutosEstimados': 8,
+          'categoriaDistancia': 'MENOS_DE_1_KM',
+        },
+      );
+
+      final eta = await service.consultarEta('inc-001');
+
+      expect(eta.minutosEstimados, 8);
+      expect(eta.categoriaDistancia, CategoriaDistancia.MENOS_DE_1_KM);
+      expect(eta.tieneDatos, isTrue);
+    });
+
+    test('GET /{id}/eta sin datos suficientes (200, ambos campos null) no lanza excepción',
+        () async {
+      when(() => client.get('/incidentes/inc-001/eta')).thenAnswer(
+        (_) async => {
+          'minutosEstimados': null,
+          'categoriaDistancia': null,
+        },
+      );
+
+      final eta = await service.consultarEta('inc-001');
+
+      expect(eta.minutosEstimados, isNull);
+      expect(eta.categoriaDistancia, isNull);
+      expect(eta.tieneDatos, isFalse);
+    });
+
+    test('propaga ApiException si la consulta falla', () async {
+      when(() => client.get('/incidentes/inc-001/eta')).thenThrow(
+        const ApiException(
+          type: ApiExceptionType.notFound,
+          statusCode: 404,
+          message: 'Incidente no encontrado.',
+        ),
+      );
+
+      await expectLater(
+        service.consultarEta('inc-001'),
+        throwsA(isA<ApiException>()),
       );
     });
   });

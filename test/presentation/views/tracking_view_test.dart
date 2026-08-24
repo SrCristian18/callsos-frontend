@@ -53,6 +53,10 @@ import 'package:CallSos/presentation/views/tracking_view.dart';
 /// (mismo patrón que ya tiene `StompService.creadorCliente` un nivel más
 /// abajo) — cambio de código de producción que no se hizo aquí por no
 /// ser parte del alcance pedido (solo tests).
+///
+/// Épica 7: los argumentos de ruta ahora requieren `agenteId` además de
+/// `incidenteId` — sin él, la vista muestra un error dedicado y NUNCA
+/// llama a `consultar()` (ver el test específico para ese caso).
 class MockAuthService extends Mock implements IAuthService {}
 
 class MockIncidenteService extends Mock implements IIncidenteService {}
@@ -81,11 +85,16 @@ void main() {
     geoService = MockGeolocalizacionService();
     sesion = SesionViewModel(authService: authService, storage: FakeSecureStorage());
 
-    when(() => authService.login(username: 'den-001', password: '1234')).thenAnswer(
+    // Épica 7: DENUNCIANTE ya no accede a TrackingView (bloqueado por
+    // RouteGuard antes de llegar acá) — se loguea como AGENTE para que
+    // los datos de sesión sean consistentes con quién realmente puede
+    // abrir esta vista (aunque, como documenta el header del archivo,
+    // ningún test de acá llega a usar el rol dentro de _vm.iniciar()).
+    when(() => authService.login(username: 'ag-001', password: '1234')).thenAnswer(
       (_) async => const AuthResult(
-          token: 'jwt-den', actorId: 'den-001', rol: Rol.DENUNCIANTE, nombre: 'Ana'),
+          token: 'jwt-ag', actorId: 'ag-001', rol: Rol.AGENTE, nombre: 'Pedro'),
     );
-    await sesion.login(username: 'den-001', password: '1234');
+    await sesion.login(username: 'ag-001', password: '1234');
   });
 
   Widget appDePrueba() {
@@ -98,7 +107,12 @@ void main() {
       child: MaterialApp(
         onGenerateRoute: (_) => MaterialPageRoute(
           builder: (_) => const TrackingView(),
-          settings: const RouteSettings(arguments: {'incidenteId': 'i-001'}),
+          settings: const RouteSettings(
+            // Épica 7: agenteId ahora es requerido — sin él, la vista
+            // muestra el error de "no se pudo determinar el agente" y
+            // NUNCA llama a consultar() (ver test dedicado más abajo).
+            arguments: {'incidenteId': 'i-001', 'agenteId': 'ag-001'},
+          ),
         ),
       ),
     );
@@ -225,5 +239,34 @@ void main() {
 
     expect(find.text('No se pudo cargar el incidente.'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  group('Épica 7 — agenteId requerido en los argumentos de ruta', () {
+    testWidgets(
+        'sin agenteId en los argumentos, muestra un error dedicado y NUNCA llama a consultar()',
+        (tester) async {
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            Provider<IIncidenteService>.value(value: incidenteService),
+            Provider<IGeolocalizacionService>.value(value: geoService),
+            ChangeNotifierProvider<SesionViewModel>.value(value: sesion),
+          ],
+          child: MaterialApp(
+            onGenerateRoute: (_) => MaterialPageRoute(
+              builder: (_) => const TrackingView(),
+              // Solo incidenteId — sin agenteId (ej. link viejo/mal formado).
+              settings:
+                  const RouteSettings(arguments: {'incidenteId': 'i-001'}),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('No se pudo determinar el agente a seguir.'),
+          findsOneWidget);
+      verifyNever(() => incidenteService.consultar(any()));
+    });
   });
 }

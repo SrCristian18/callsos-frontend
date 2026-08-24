@@ -12,6 +12,7 @@ import '../../data/services/incidente_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_snackbar.dart';
 import '../widgets/estado_chip.dart';
+import '../widgets/eta_widget.dart';
 import '../widgets/selector_tipo_incidente.dart';
 
 /// Detalle completo de un incidente.
@@ -21,10 +22,16 @@ import '../widgets/selector_tipo_incidente.dart';
 /// Recibe `incidenteId` como argumento de ruta y llama
 /// `GET /incidentes/{id}`.
 ///
-/// Botones contextuales según rol + estado:
-/// - DENUNCIANTE + AGENTE_EN_CAMINO → "Ver agente en mapa" (→ TrackingView F.3).
+/// Botones/widgets contextuales según rol + estado:
+/// - DENUNCIANTE + AGENTE_EN_CAMINO → tarjeta de ETA (Épica 7, `EtaWidget`) —
+///   reemplaza el antiguo botón "Ver agente en mapa" (retirado por P6,
+///   Épica 3: el denunciante ya no puede ver el GPS crudo del agente).
 /// - DENUNCIANTE dueño + activo      → "Actualizar tipo" (Épica 6) →
 ///   selector (`selector_tipo_incidente.dart`) → PATCH /{id}/tipo.
+/// - AGENTE + (ASIGNADO/EN_CAMINO/EN_ATENCION) → "Compartir mi ubicación"
+///   (Épica 7) → TrackingView en modo emisor.
+/// - OPERADOR_CAI/COMANDO + agente asignado + (ASIGNADO/EN_CAMINO/EN_ATENCION)
+///   → "Ver ubicación del agente" (Épica 7) → TrackingView en modo receptor.
 /// - AGENTE + AGENTE_ASIGNADO       → "Ir en camino" → PATCH /{id}/en-camino.
 /// - AGENTE + AGENTE_EN_CAMINO      → "Llegué — Atender" → PATCH /{id}/atender.
 /// - AGENTE + EN_ATENCION           → "Finalizar" → PATCH /{id}/evaluar + ReporteHallazgos.
@@ -45,9 +52,29 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
 
   late String _incidenteId;
 
+  /// FIX: sin esta guarda, `_cargar()` se disparaba en cada
+  /// `didChangeDependencies()` — y ese método NO se llama una sola vez.
+  /// Flutter lo vuelve a invocar cada vez que cambia una dependencia de
+  /// InheritedWidget, y `ModalRoute.of(context)` es una de esas
+  /// dependencias: cuando esta vista deja de ser la ruta activa (ej. se
+  /// abre `mostrarSelectorTipoIncidente`, que internamente hace
+  /// `Navigator.push` de su propia ruta) y cuando vuelve a serlo (se
+  /// cierra el selector), `isCurrent` cambia en ambos sentidos y dispara
+  /// `didChangeDependencies()` de nuevo — 2 disparos extra por cada
+  /// apertura/cierre de CUALQUIER modal sobre esta vista, sin relación
+  /// con el argumento de ruta (`incidenteId`), que no cambió.
+  /// `_incidenteId` sí necesita leerse de `ModalRoute.of(context)` en
+  /// `didChangeDependencies()` (no en `initState()`, porque ahí el
+  /// contexto todavía no tiene acceso a los InheritedWidgets de rutas),
+  /// pero la CARGA (`_cargar()`) solo debe dispararse la primera vez.
+  bool _yaCargado = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_yaCargado) return;
+    _yaCargado = true;
+
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     _incidenteId = args?['incidenteId'] as String? ?? '';
@@ -253,6 +280,16 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
 
           const SizedBox(height: 20),
 
+          // ── Widget de ETA (Épica 7) ──────────────────────────────────
+          // Solo para el DENUNCIANTE, y solo mientras hay un agente en
+          // camino — antes de eso no hay ETA que calcular, y en estados
+          // posteriores (EN_ATENCION+) el agente ya llegó.
+          if (rol == Rol.DENUNCIANTE &&
+              inc.estado == EstadoIncidente.AGENTE_EN_CAMINO) ...[
+            EtaWidget(incidenteId: inc.id),
+            const SizedBox(height: 20),
+          ],
+
           // ── Botones contextuales ────────────────────────────────────
           if (!_enProceso) ..._botonesContextuales(inc, rol, service, sesion.actorId)
           else
@@ -272,16 +309,43 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
       Incidente inc, Rol? rol, IIncidenteService service, String? actorId) {
     final botones = <Widget>[];
 
-    // DENUNCIANTE + AGENTE_EN_CAMINO → ver en mapa
-    if (rol == Rol.DENUNCIANTE &&
-        inc.estado == EstadoIncidente.AGENTE_EN_CAMINO) {
+    // Épica 7: tracking en tiempo real — ya NO para DENUNCIANTE (ver
+    // EtaWidget más arriba, que lo reemplaza). Se muestra mientras hay
+    // (o puede haber en breve) un agente moviéndose: desde que se le
+    // asigna hasta que empieza la atención en el sitio.
+    const estadosConTracking = {
+      EstadoIncidente.AGENTE_ASIGNADO,
+      EstadoIncidente.AGENTE_EN_CAMINO,
+      EstadoIncidente.EN_ATENCION,
+    };
+
+    // AGENTE → comparte su propia posición (modo emisor).
+    if (rol == Rol.AGENTE && estadosConTracking.contains(inc.estado)) {
       botones.add(_boton(
-        label: '📍 Ver agente en mapa',
+        label: '📍 Compartir mi ubicación',
         color: AppColors.verdeOscuro,
         onPressed: () => Navigator.pushNamed(
           context,
           AppRoutes.tracking,
-          arguments: {'incidenteId': inc.id},
+          arguments: {'incidenteId': inc.id, 'agenteId': actorId},
+        ),
+      ));
+    }
+
+    // OPERADOR_CAI / COMANDO → ve la posición del agente asignado (modo
+    // receptor). Requiere que ya haya una asignación activa
+    // (inc.agenteId != null) — antes de AGENTE_ASIGNADO no hay a quién
+    // seguir todavía.
+    if ((rol == Rol.OPERADOR_CAI || rol == Rol.COMANDO) &&
+        inc.agenteId != null &&
+        estadosConTracking.contains(inc.estado)) {
+      botones.add(_boton(
+        label: '📍 Ver ubicación del agente',
+        color: AppColors.verdeOscuro,
+        onPressed: () => Navigator.pushNamed(
+          context,
+          AppRoutes.tracking,
+          arguments: {'incidenteId': inc.id, 'agenteId': inc.agenteId},
         ),
       ));
     }
@@ -307,6 +371,10 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
     // AGENTE + AGENTE_ASIGNADO → en camino
     if (rol == Rol.AGENTE &&
         inc.estado == EstadoIncidente.AGENTE_ASIGNADO) {
+      // FIX Épica 7: sin esta guarda, "Compartir mi ubicación" (arriba)
+      // y "Ir en camino" quedaban pegados sin espacio cuando ambos
+      // aplican a la vez (mismo estado AGENTE_ASIGNADO para AGENTE).
+      if (botones.isNotEmpty) botones.add(const SizedBox(height: 10));
       botones.add(_boton(
         label: '🚓 Ir en camino',
         color: Colors.blue.shade700,
@@ -320,6 +388,9 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
     // AGENTE + AGENTE_EN_CAMINO → atender
     if (rol == Rol.AGENTE &&
         inc.estado == EstadoIncidente.AGENTE_EN_CAMINO) {
+      // FIX Épica 7: misma razón que arriba — "Compartir mi ubicación"
+      // también aplica en AGENTE_EN_CAMINO.
+      if (botones.isNotEmpty) botones.add(const SizedBox(height: 10));
       botones.add(_boton(
         label: '🏠 Llegué — Iniciar atención',
         color: Colors.indigo,
@@ -333,6 +404,9 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
     // AGENTE + EN_ATENCION → reporte de hallazgos (sin evaluar() previo)
     if (rol == Rol.AGENTE &&
         inc.estado == EstadoIncidente.EN_ATENCION) {
+      // FIX Épica 7: misma razón que arriba — "Compartir mi ubicación"
+      // también aplica en EN_ATENCION.
+      if (botones.isNotEmpty) botones.add(const SizedBox(height: 10));
       botones.add(_boton(
         label: '✅ Finalizar y reportar hallazgos',
         color: Colors.green.shade700,

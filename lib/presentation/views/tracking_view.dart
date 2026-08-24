@@ -16,16 +16,26 @@ import '../viewmodels/tracking_viewmodel.dart';
 /// Vista de seguimiento en tiempo real del agente en camino.
 ///
 /// F.3 — TrackingView + TrackingViewModel + WebSocket STOMP.
+/// Épica 7: ya NO alcanzable por DENUNCIANTE (bloqueado en
+/// `AppRoutes.tracking` vía `RouteGuard` — fix P6). Reservada a AGENTE
+/// (emisor de su propia posición) y OPERADOR_CAI/COMANDO (receptores de
+/// la posición del agente asignado).
 ///
-/// Recibe `incidenteId` como argumento de ruta. Internamente:
+/// Recibe como argumentos de ruta:
+/// - `incidenteId` (requerido).
+/// - `agenteId` (requerido): a qué agente seguir. Para AGENTE suele ser
+///   su propio id (`sesion.actorId`); para CAI/Comando, el agente
+///   asignado al incidente (`Incidente.agenteId`, ver
+///   `DetalleIncidenteView`).
+///
+/// Internamente:
 /// 1. Carga el detalle del incidente (GET /{id}) para obtener coordenadas
 ///    del punto de emergencia y centrar el mapa.
-/// 2. Inicia [TrackingViewModel] en modo receptor (DENUNCIANTE) o emisor
-///    (AGENTE) según el rol de la sesión.
+/// 2. Inicia [TrackingViewModel] en modo emisor (AGENTE) o receptor
+///    (CAI/Comando) según el rol de la sesión.
 /// 3. Muestra [FlutterMap] con tiles OpenStreetMap y los marcadores:
 ///    - 🔴 Punto de la emergencia (coordenadas del incidente).
 ///    - 🔵 Agente (actualizado en tiempo real vía STOMP).
-///    - 📍 Denunciante (posición inicial del incidente, estática).
 class TrackingView extends StatefulWidget {
   const TrackingView({super.key});
 
@@ -45,6 +55,7 @@ class _TrackingViewState extends State<TrackingView> {
   // _incidente quedaba null para siempre y el botón "Reintentar" quedaba
   // muerto: pasaba a mostrar el spinner y ahí se quedaba, sin volver a
   // llamar _inicializar()).
+  String? _agenteId; // Épica 7 — a qué agente seguir (ver docstring)
   bool _cargandoIncidente = true;
   String? _errorCarga;
   bool _inicializado = false; // guard: didChangeDependencies puede llamarse N veces
@@ -67,14 +78,27 @@ class _TrackingViewState extends State<TrackingView> {
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final incidenteId = args?['incidenteId'] as String? ?? '';
-    if (incidenteId.isNotEmpty) {
+    final agenteId = args?['agenteId'] as String? ?? '';
+    if (incidenteId.isNotEmpty && agenteId.isNotEmpty) {
       _inicializado = true;
       _incidenteId = incidenteId;
-      _inicializar(incidenteId);
+      _agenteId = agenteId;
+      _inicializar(incidenteId, agenteId);
+    } else if (incidenteId.isNotEmpty) {
+      // agenteId ausente (navegación mal formada, ej. link viejo) — se
+      // muestra el error de carga en vez de romper con un `!` null más
+      // adelante; no debería ocurrir si toda la navegación pasa por
+      // DetalleIncidenteView (ver _botonesContextuales allí).
+      _inicializado = true;
+      _incidenteId = incidenteId;
+      setState(() {
+        _errorCarga = 'No se pudo determinar el agente a seguir.';
+        _cargandoIncidente = false;
+      });
     }
   }
 
-  Future<void> _inicializar(String incidenteId) async {
+  Future<void> _inicializar(String incidenteId, String agenteId) async {
     // 1 — cargar detalle del incidente para obtener coords del punto
     try {
       final inc =
@@ -98,7 +122,8 @@ class _TrackingViewState extends State<TrackingView> {
     final sesion = context.read<SesionViewModel>();
     await _vm.iniciar(
       incidenteId: incidenteId,
-      rol: sesion.rol ?? Rol.DENUNCIANTE,
+      agenteId: agenteId,
+      rol: sesion.rol ?? Rol.AGENTE,
       actorId: sesion.actorId ?? '',
       posicionInicial: _incidente != null
           ? Ubicacion(
@@ -193,8 +218,8 @@ class _TrackingViewState extends State<TrackingView> {
                     _cargandoIncidente = true;
                     _errorCarga = null;
                   });
-                  if (_incidenteId != null) {
-                    _inicializar(_incidenteId!);
+                  if (_incidenteId != null && _agenteId != null) {
+                    _inicializar(_incidenteId!, _agenteId!);
                   }
                 },
               ),
@@ -441,7 +466,11 @@ class _PanelInfo extends StatelessWidget {
                   label: 'Agente'),
               _leyendaItem(
                   color: Colors.orange.shade600, icon: Icons.person_pin,
-                  label: 'Denunciante'),
+                  // Épica 7: renombrado de "Denunciante" — este marcador
+                  // ya no es visto por el denunciante (retirado, fix P6);
+                  // para AGENTE/CAI/Comando representa el punto de
+                  // origen reportado del incidente, no una persona.
+                  label: 'Punto reportado'),
             ],
           ),
         ],

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:stomp_dart_client/stomp_dart_client.dart';
 
 import '../../core/app_config.dart';
+import '../models/eta_info.dart';
 import '../services/token_provider.dart';
 
 /// Mensaje de ubicación recibido del backend vía STOMP.
@@ -52,18 +53,44 @@ abstract class IStompService {
   /// Desconecta del servidor STOMP y libera recursos.
   Future<void> desconectar();
 
-  /// Suscribe al topic de ubicación del incidente.
+  /// Suscribe al topic de ubicación de un AGENTE.
+  ///
+  /// Épica 3/7 (fix P6): antes era por incidente
+  /// (`/topic/incidente/{incidenteId}/ubicacion`), suscribible por
+  /// cualquier autenticado — incluido el denunciante, exactamente lo que
+  /// P6 prohíbe. Ahora es por agente; la autorización real de quién
+  /// puede suscribirse (el propio agente, su CAI, o Comando — nunca el
+  /// denunciante) la aplica el backend en `StompAuthChannelInterceptor`
+  /// sobre el SUBSCRIBE — el denunciante ya ni siquiera puede llegar a
+  /// llamar este método porque `AppRoutes.tracking` le bloquea la ruta
+  /// (ver `RouteGuard`), pero la seguridad real vive en el backend, no
+  /// en que Flutter no muestre el botón.
   ///
   /// Devuelve un [StreamSubscription]-equivalente que puede cancelarse
   /// con [cancelarSuscripcion].
   ///
-  /// Destino: `/topic/incidente/{incidenteId}/ubicacion`
-  void suscribirUbicacion({
-    required String incidenteId,
+  /// Destino: `/topic/agente/{agenteId}/ubicacion`
+  void suscribirUbicacionAgente({
+    required String agenteId,
     required void Function(UbicacionMensaje) onMensaje,
   });
 
-  /// Cancela la suscripción al topic de ubicación.
+  /// Épica 7 (nuevo): suscribe al ETA de un incidente para el
+  /// denunciante — reemplaza el mapa de tracking retirado por P6.
+  ///
+  /// A diferencia de [suscribirUbicacionAgente], este topic no requiere
+  /// autorización especial en el backend (ver
+  /// `PublicarUbicacionAgenteService.publicarEtaSiCorresponde`): el ETA
+  /// nunca expone lat/lon, solo minutos + categoría de distancia — no es
+  /// información sensible al nivel del GPS crudo.
+  ///
+  /// Destino: `/topic/incidente/{incidenteId}/eta`
+  void suscribirEta({
+    required String incidenteId,
+    required void Function(EtaInfo) onMensaje,
+  });
+
+  /// Cancela TODAS las suscripciones activas (ubicación y/o ETA).
   void cancelarSuscripcion();
 
   /// Envía la posición GPS del agente al backend.
@@ -129,7 +156,8 @@ class StompService implements IStompService {
   final StompClient Function({required StompConfig config}) _creadorCliente;
 
   StompClient? _client;
-  StompUnsubscribe? _suscripcionActual;
+  StompUnsubscribe? _suscripcionUbicacion;
+  StompUnsubscribe? _suscripcionEta;
   bool _conectado = false;
 
   StompService({
@@ -195,14 +223,14 @@ class StompService implements IStompService {
   }
 
   @override
-  void suscribirUbicacion({
-    required String incidenteId,
+  void suscribirUbicacionAgente({
+    required String agenteId,
     required void Function(UbicacionMensaje) onMensaje,
   }) {
     if (_client == null || !_conectado) return;
 
-    _suscripcionActual = _client!.subscribe(
-      destination: '/topic/incidente/$incidenteId/ubicacion',
+    _suscripcionUbicacion = _client!.subscribe(
+      destination: '/topic/agente/$agenteId/ubicacion',
       callback: (frame) {
         if (frame.body == null || frame.body!.isEmpty) return;
         try {
@@ -217,9 +245,32 @@ class StompService implements IStompService {
   }
 
   @override
+  void suscribirEta({
+    required String incidenteId,
+    required void Function(EtaInfo) onMensaje,
+  }) {
+    if (_client == null || !_conectado) return;
+
+    _suscripcionEta = _client!.subscribe(
+      destination: '/topic/incidente/$incidenteId/eta',
+      callback: (frame) {
+        if (frame.body == null || frame.body!.isEmpty) return;
+        try {
+          final json = jsonDecode(frame.body!) as Map<String, dynamic>;
+          onMensaje(EtaInfo.fromJson(json));
+        } catch (_) {
+          // Payload malformado — ignorar silenciosamente.
+        }
+      },
+    );
+  }
+
+  @override
   void cancelarSuscripcion() {
-    _suscripcionActual?.call();
-    _suscripcionActual = null;
+    _suscripcionUbicacion?.call();
+    _suscripcionUbicacion = null;
+    _suscripcionEta?.call();
+    _suscripcionEta = null;
   }
 
   @override

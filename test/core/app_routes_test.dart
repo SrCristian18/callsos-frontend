@@ -92,9 +92,13 @@ void main() {
           DetalleIncidenteView,
           {Rol.DENUNCIANTE, Rol.AGENTE, Rol.OPERADOR_CAI, Rol.COMANDO}
         ),
+        // Épica 7 (fix P6): DENUNCIANTE ya no está en los roles
+        // permitidos de /tracking — el mapa de tracking en vivo fue
+        // retirado para ese rol y reemplazado por EtaWidget en
+        // DetalleIncidenteView.
         AppRoutes.tracking: (
           TrackingView,
-          {Rol.DENUNCIANTE, Rol.AGENTE, Rol.OPERADOR_CAI, Rol.COMANDO}
+          {Rol.AGENTE, Rol.OPERADOR_CAI, Rol.COMANDO}
         ),
         AppRoutes.reporteHallazgos: (
           ReporteHallazgosView,
@@ -252,6 +256,33 @@ void main() {
 
       expect(find.text('CONTENIDO_PROTEGIDO'), findsOneWidget);
       expect(find.text('role_selection'), findsNothing);
+    });
+
+    testWidgets(
+        'Épica 7 (fix P6): DENUNCIANTE autenticado NO ve el contenido de '
+        '/tracking, redirige a su Home', (tester) async {
+      final authService = MockAuthService();
+      when(() => authService.login(username: 'den-001', password: '1234')).thenAnswer(
+        (_) async => const AuthResult(
+            token: 'jwt-den', actorId: 'den-001', rol: Rol.DENUNCIANTE),
+      );
+      final sesion = await _sesionSinSesionPrevia(authService);
+      await sesion.login(username: 'den-001', password: '1234');
+
+      // Mismo guard con el que AppRoutes.tracking envuelve TrackingView
+      // tras el fix — DENUNCIANTE ya no está en rolesPermitidos.
+      await tester.pumpWidget(appDePrueba(
+        sesion,
+        const RouteGuard(
+          rolesPermitidos: {Rol.AGENTE, Rol.OPERADOR_CAI, Rol.COMANDO},
+          child: Text('CONTENIDO_DE_TRACKING'),
+        ),
+      ));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('CONTENIDO_DE_TRACKING'), findsNothing);
+      expect(find.text('home_denunciante'), findsOneWidget);
     });
   });
 }

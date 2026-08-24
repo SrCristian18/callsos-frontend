@@ -93,6 +93,21 @@ class AppRoutes {
     Rol.COMANDO,
   };
 
+  /// Épica 7 (fix P6, defensa en profundidad): el DENUNCIANTE ya no
+  /// tiene acceso a `/tracking` — el mapa de tracking en vivo fue
+  /// retirado para ese rol (Épica 3, backend) y reemplazado por el
+  /// widget de ETA en `DetalleIncidenteView`. El backend YA rechaza el
+  /// SUBSCRIBE STOMP del denunciante (`StompAuthChannelInterceptor`),
+  /// así que esto no es la protección real — es la segunda capa: ni
+  /// siquiera debería poder LLEGAR a la pantalla, para no mostrar una
+  /// vista rota (conectada pero sin datos) si de algún modo se
+  /// intentara navegar ahí (ej. deep link viejo).
+  static const Set<Rol> _rolesTracking = {
+    Rol.AGENTE,
+    Rol.OPERADOR_CAI,
+    Rol.COMANDO,
+  };
+
   static Map<String, WidgetBuilder> get routes => {
     // Splash
     splash:               (_) => const SplashView(),

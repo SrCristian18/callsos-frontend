@@ -58,6 +58,15 @@ class Incidente {
   /// Nombre legible del CAI asignado, si ya ocurrió.
   final String? nombreCAI;
 
+  /// Épica 7: id del agente con asignación ACTIVA sobre este incidente,
+  /// si ya la hay (`null` en CREADO/DERIVADO_A_CAI). CAI y Comando lo
+  /// necesitan para saber a qué topic de tracking suscribirse
+  /// (`/topic/agente/{agenteId}/ubicacion`, ver Épica 3/[StompService]).
+  final String? agenteId;
+
+  /// Nombre legible del agente asignado, si ya ocurrió.
+  final String? nombreAgente;
+
   const Incidente({
     required this.id,
     required this.fechaHora,
@@ -69,6 +78,8 @@ class Incidente {
     required this.denuncianteId,
     this.unidadPolicialId,
     this.nombreCAI,
+    this.agenteId,
+    this.nombreAgente,
   });
 
   /// Ubicación como value object (ver [Ubicacion]) — conveniencia para
@@ -91,6 +102,8 @@ class Incidente {
     String? denuncianteId,
     String? unidadPolicialId,
     String? nombreCAI,
+    String? agenteId,
+    String? nombreAgente,
   }) {
     return Incidente(
       id: id ?? this.id,
@@ -103,6 +116,8 @@ class Incidente {
       denuncianteId: denuncianteId ?? this.denuncianteId,
       unidadPolicialId: unidadPolicialId ?? this.unidadPolicialId,
       nombreCAI: nombreCAI ?? this.nombreCAI,
+      agenteId: agenteId ?? this.agenteId,
+      nombreAgente: nombreAgente ?? this.nombreAgente,
     );
   }
 
@@ -122,6 +137,8 @@ class Incidente {
       denuncianteId: json['denuncianteId'] as String,
       unidadPolicialId: json['unidadPolicialId'] as String?,
       nombreCAI: json['nombreCAI'] as String?,
+      agenteId: json['agenteId'] as String?,
+      nombreAgente: json['nombreAgente'] as String?,
     );
   }
 
@@ -142,6 +159,8 @@ class Incidente {
         'denuncianteId': denuncianteId,
         'unidadPolicialId': unidadPolicialId,
         'nombreCAI': nombreCAI,
+        'agenteId': agenteId,
+        'nombreAgente': nombreAgente,
       };
 
   @override

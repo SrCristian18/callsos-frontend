@@ -1,5 +1,6 @@
 import '../models/enums/estado_incidente.dart';
 import '../models/enums/tipo_incidente_enum.dart';
+import '../models/eta_info.dart';
 import '../models/incidente.dart';
 import '../models/valueobject/ubicacion.dart';
 import 'api_client.dart';
@@ -123,6 +124,19 @@ abstract class IIncidenteService {
   /// `ApiExceptionType.businessRule` — si el incidente ya está en un
   /// estado terminal, o si `nuevoTipo` es igual al tipo vigente).
   Future<void> actualizarTipo(String id, TipoIncidenteEnum nuevoTipo);
+
+  /// `GET /incidentes/{id}/eta` — Épica 7: tiempo estimado de llegada del
+  /// agente para el denunciante dueño del incidente.
+  ///
+  /// Complementa la suscripción STOMP a `/topic/incidente/{id}/eta`
+  /// ([IStompService.suscribirEta]): este método cubre el caso de carga
+  /// inicial/reconexión — el widget de ETA lo llama una vez al montar,
+  /// sin esperar a que llegue el primer mensaje del broker.
+  ///
+  /// `minutosEstimados`/`categoriaDistancia` en el [EtaInfo] devuelto
+  /// pueden ser ambos `null` (200, no error) si el incidente aún no está
+  /// en `AGENTE_EN_CAMINO` o el agente no ha reportado posición todavía.
+  Future<EtaInfo> consultarEta(String id);
 }
 
 class IncidenteService implements IIncidenteService {
@@ -236,5 +250,11 @@ class IncidenteService implements IIncidenteService {
       '/incidentes/$id/tipo',
       data: {'nuevoTipo': nuevoTipo.toJson()},
     );
+  }
+
+  @override
+  Future<EtaInfo> consultarEta(String id) async {
+    final data = await _client.get('/incidentes/$id/eta');
+    return EtaInfo.fromJson(data as Map<String, dynamic>);
   }
 }

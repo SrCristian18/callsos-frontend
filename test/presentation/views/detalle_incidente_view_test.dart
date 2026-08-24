@@ -43,7 +43,9 @@ class FakeSecureStorage implements ISecureStorage {
 }
 
 Incidente _fake(String id, EstadoIncidente estado,
-        {String? nombreCAI, String denuncianteId = 'den-001'}) =>
+        {String? nombreCAI,
+        String denuncianteId = 'den-001',
+        String? agenteId}) =>
     Incidente(
       id: id,
       fechaHora: DateTime(2026, 6, 14, 10, 30),
@@ -54,6 +56,7 @@ Incidente _fake(String id, EstadoIncidente estado,
       longitud: -75.4794,
       denuncianteId: denuncianteId,
       nombreCAI: nombreCAI,
+      agenteId: agenteId,
     );
 
 void main() {
@@ -96,7 +99,8 @@ void main() {
         routes: {
           AppRoutes.tracking: (ctx) {
             final args = ModalRoute.of(ctx)!.settings.arguments as Map;
-            return Scaffold(body: Text('tracking:${args['incidenteId']}'));
+            return Scaffold(
+                body: Text('tracking:${args['incidenteId']}:${args['agenteId']}'));
           },
           AppRoutes.reporteHallazgos: (ctx) {
             final args = ModalRoute.of(ctx)!.settings.arguments as Map;
@@ -156,19 +160,72 @@ void main() {
   });
 
   testWidgets(
-      'DENUNCIANTE + AGENTE_EN_CAMINO: botón "Ver agente en mapa" navega a Tracking '
-      'con el incidenteId', (tester) async {
+      'DENUNCIANTE + AGENTE_EN_CAMINO: muestra el widget de ETA (Épica 7) '
+      'en vez del antiguo botón "Ver agente en mapa"', (tester) async {
+    // ADVERTENCIA (mismo patrón documentado en tracking_view_test.dart):
+    // EtaWidget crea su propio StompService REAL en initState() y
+    // dispara conectar() de inmediato — sin punto de inyección en esta
+    // vista. Por eso este test usa pump() acotado, NUNCA pumpAndSettle(),
+    // para no esperar a que un intento de conexión WebSocket real
+    // (que fallará/reintentará en el entorno de test) se resuelva.
     await loguearComo('den-001', Rol.DENUNCIANTE);
     when(() => incidenteService.consultar('i-001'))
         .thenAnswer((_) async => _fake('i-001', EstadoIncidente.AGENTE_EN_CAMINO));
 
     await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+    await tester.pump(); // resuelve el FutureBuilder de consultar()
+    await tester.pump(); // deja construir el árbol tras setState()
+
+    expect(find.text('Tiempo estimado de llegada'), findsOneWidget);
+    expect(find.textContaining('Ver agente en mapa'), findsNothing);
+  });
+
+  testWidgets(
+      'AGENTE + AGENTE_ASIGNADO: botón "Compartir mi ubicación" navega a '
+      'Tracking con incidenteId y agenteId == actorId (Épica 7)',
+      (tester) async {
+    await loguearComo('ag-001', Rol.AGENTE);
+    when(() => incidenteService.consultar('i-001'))
+        .thenAnswer((_) async => _fake('i-001', EstadoIncidente.AGENTE_ASIGNADO));
+
+    await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.textContaining('Ver agente en mapa'));
+    await tester.tap(find.textContaining('Compartir mi ubicación'));
     await tester.pumpAndSettle();
 
-    expect(find.text('tracking:i-001'), findsOneWidget);
+    expect(find.text('tracking:i-001:ag-001'), findsOneWidget);
+  });
+
+  testWidgets(
+      'OPERADOR_CAI + agente asignado + AGENTE_EN_CAMINO: botón "Ver ubicación '
+      'del agente" navega a Tracking con el agenteId del incidente (Épica 7)',
+      (tester) async {
+    await loguearComo('cai-001', Rol.OPERADOR_CAI);
+    when(() => incidenteService.consultar('i-001')).thenAnswer((_) async => _fake(
+        'i-001', EstadoIncidente.AGENTE_EN_CAMINO,
+        agenteId: 'ag-999'));
+
+    await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('Ver ubicación del agente'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('tracking:i-001:ag-999'), findsOneWidget);
+  });
+
+  testWidgets(
+      'COMANDO en AGENTE_EN_CAMINO pero sin agenteId resuelto todavía: '
+      'NO muestra "Ver ubicación del agente" (guarda defensiva)', (tester) async {
+    await loguearComo('com-001', Rol.COMANDO);
+    when(() => incidenteService.consultar('i-001')).thenAnswer(
+        (_) async => _fake('i-001', EstadoIncidente.AGENTE_EN_CAMINO, agenteId: null));
+
+    await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Ver ubicación del agente'), findsNothing);
   });
 
   testWidgets('AGENTE + AGENTE_ASIGNADO: "Ir en camino" llama enCamino(), snackbar y refresca',
@@ -304,8 +361,18 @@ void main() {
       await tester.tap(find.textContaining('Actualizar tipo de incidente'));
       await tester.pumpAndSettle();
 
+      // Defensivo: si el catálogo de tipos crece, o el sheet vuelve a
+      // necesitar scroll interno por cualquier motivo, ensureVisible()
+      // scrollea el ListView hasta el ítem antes de aserir/tocar sobre
+      // él — evita que este test vuelva a romperse por un ítem fuera
+      // del viewport (la causa raíz real ya se corrigió en
+      // selector_tipo_incidente.dart con isScrollControlled: true).
+      final finderAtentados = find.text('Atentados');
+      await tester.ensureVisible(finderAtentados);
+      await tester.pumpAndSettle();
+
       expect(find.text('Riñas o peleas'), findsOneWidget);
-      expect(find.text('Atentados'), findsOneWidget);
+      expect(finderAtentados, findsOneWidget);
       // El tipo actual del incidente (Robos o asaltos) no debe ofrecerse
       // como opción — aparece una sola vez, en el AppBar/card, no en la lista.
       expect(find.text('Robos o asaltos'), findsWidgets);
@@ -327,7 +394,10 @@ void main() {
       await tester.tap(find.textContaining('Actualizar tipo de incidente'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Riñas o peleas'));
+      final finderRinas = find.text('Riñas o peleas');
+      await tester.ensureVisible(finderRinas);
+      await tester.pumpAndSettle();
+      await tester.tap(finderRinas);
       await tester.pumpAndSettle();
 
       verify(() => incidenteService.actualizarTipo('i-001', TipoIncidenteEnum.RINAS_O_PELEAS))
@@ -373,7 +443,10 @@ void main() {
 
       await tester.tap(find.textContaining('Actualizar tipo de incidente'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Riñas o peleas'));
+      final finderRinas403 = find.text('Riñas o peleas');
+      await tester.ensureVisible(finderRinas403);
+      await tester.pumpAndSettle();
+      await tester.tap(finderRinas403);
       await tester.pumpAndSettle();
 
       expect(find.text('El denunciante autenticado no es el dueño de este incidente.'),
