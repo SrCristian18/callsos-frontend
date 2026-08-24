@@ -18,6 +18,8 @@ void main() {
         'denuncianteId': 'den-123',
         'unidadPolicialId': null,
         'nombreCAI': null,
+        'agenteId': null,
+        'nombreAgente': null,
       };
 
       final incidente = Incidente.fromJson(json);
@@ -32,9 +34,12 @@ void main() {
       expect(incidente.denuncianteId, 'den-123');
       expect(incidente.unidadPolicialId, isNull);
       expect(incidente.nombreCAI, isNull);
+      expect(incidente.agenteId, isNull);
+      expect(incidente.nombreAgente, isNull);
     });
 
-    test('incidente ya derivado a un CAI (con unidadPolicialId y nombreCAI)', () {
+    test('incidente ya derivado a un CAI (con unidadPolicialId y nombreCAI) '
+        'pero sin agente asignado todavía', () {
       final json = {
         'id': 'inc-002',
         'fechaHora': '2026-06-14T11:00:00.000',
@@ -46,6 +51,8 @@ void main() {
         'denuncianteId': 'den-456',
         'unidadPolicialId': 'cai-007',
         'nombreCAI': 'CAI San Francisco',
+        'agenteId': null,
+        'nombreAgente': null,
       };
 
       final incidente = Incidente.fromJson(json);
@@ -56,6 +63,31 @@ void main() {
       expect(incidente.estado, EstadoIncidente.DERIVADO_A_CAI);
       expect(incidente.unidadPolicialId, 'cai-007');
       expect(incidente.nombreCAI, 'CAI San Francisco');
+      expect(incidente.agenteId, isNull);
+      expect(incidente.nombreAgente, isNull);
+    });
+
+    test('Épica 7 — incidente con agente asignado (agenteId/nombreAgente '
+        'presentes)', () {
+      final json = {
+        'id': 'inc-005',
+        'fechaHora': '2026-06-14T11:30:00.000',
+        'tipo': 'ROBOS_O_ASALTOS',
+        'descripcion': 'desc',
+        'estado': 'AGENTE_EN_CAMINO',
+        'latitud': 10.4,
+        'longitud': -75.5,
+        'denuncianteId': 'den-456',
+        'unidadPolicialId': 'cai-007',
+        'nombreCAI': 'CAI San Francisco',
+        'agenteId': 'ag-999',
+        'nombreAgente': 'Pedro Test',
+      };
+
+      final incidente = Incidente.fromJson(json);
+
+      expect(incidente.agenteId, 'ag-999');
+      expect(incidente.nombreAgente, 'Pedro Test');
     });
   });
 
@@ -72,6 +104,8 @@ void main() {
         'denuncianteId': 'den-789',
         'unidadPolicialId': 'cai-003',
         'nombreCAI': 'CAI Crespo',
+        'agenteId': 'ag-003',
+        'nombreAgente': 'Luisa Test',
       };
 
       final incidente = Incidente.fromJson(original);
@@ -87,6 +121,8 @@ void main() {
       expect(reconstruido.denuncianteId, incidente.denuncianteId);
       expect(reconstruido.unidadPolicialId, incidente.unidadPolicialId);
       expect(reconstruido.nombreCAI, incidente.nombreCAI);
+      expect(reconstruido.agenteId, incidente.agenteId);
+      expect(reconstruido.nombreAgente, incidente.nombreAgente);
     });
   });
 
@@ -120,10 +156,14 @@ void main() {
       final actualizado = base.copyWith(
         estado: EstadoIncidente.FINALIZADO,
         nombreCAI: 'CAI Crespo',
+        agenteId: 'ag-001',
+        nombreAgente: 'Pedro Test',
       );
 
       expect(actualizado.estado, EstadoIncidente.FINALIZADO);
       expect(actualizado.nombreCAI, 'CAI Crespo');
+      expect(actualizado.agenteId, 'ag-001');
+      expect(actualizado.nombreAgente, 'Pedro Test');
       // El resto de campos no cambia:
       expect(actualizado.id, base.id);
       expect(actualizado.tipo, base.tipo);

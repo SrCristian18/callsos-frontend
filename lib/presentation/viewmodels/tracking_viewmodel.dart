@@ -19,26 +19,34 @@ enum TrackingConexionEstado {
 /// ViewModel del tracking en tiempo real.
 ///
 /// F.3 — TrackingView + TrackingViewModel + WebSocket STOMP.
+/// Épica 7: se retira por completo el modo DENUNCIANTE (fix P6 —
+/// Épica 3 — ya bloqueaba esto en el backend; ahora tampoco es
+/// alcanzable desde el frontend, ver `AppRoutes.tracking`/`RouteGuard`
+/// y el widget de ETA que lo reemplaza en `DetalleIncidenteView`).
 ///
 /// Opera en dos modos según el rol del usuario:
-///
-/// **Modo DENUNCIANTE** (receptor):
-/// - Conecta al broker STOMP.
-/// - Suscribe a `/topic/incidente/{id}/ubicacion`.
-/// - Cada mensaje recibido actualiza [posicionAgente].
-/// - Solicita la última posición conocida al conectarse (reconexión).
 ///
 /// **Modo AGENTE** (emisor):
 /// - Conecta al broker STOMP.
 /// - Inicia [IGeolocalizacionService.streamPosicion()] con filtro de 10 m.
-/// - Cada nueva posición GPS se envía a `/app/ubicacion/{id}`.
-/// - [posicionAgente] también se actualiza localmente para el mapa.
+/// - Cada nueva posición GPS se envía a `/app/ubicacion/{incidenteId}`.
+/// - También se suscribe a su propio topic de ubicación (feedback local
+///   del mapa) y [posicionAgente] se actualiza además de forma optimista
+///   sin esperar el eco del broker.
+///
+/// **Modo OPERADOR_CAI / COMANDO** (receptor):
+/// - Conecta al broker STOMP.
+/// - Suscribe a `/topic/agente/{agenteId}/ubicacion` — [agenteId] es el
+///   del agente ASIGNADO al incidente (no el actorId de la sesión), lo
+///   provee el caller (ver `DetalleIncidenteView`/`IncidenteResponse.agenteId`).
+/// - Cada mensaje recibido actualiza [posicionAgente].
+/// - Solicita la última posición conocida al conectarse (reconexión).
 ///
 /// Uso en [TrackingView]:
 /// ```dart
 /// // initState:
-/// vm.iniciar(incidenteId: id, rol: sesion.rol!, actorId: sesion.actorId!,
-///            posicionInicial: Ubicacion(lat, lon));
+/// vm.iniciar(incidenteId: id, agenteId: agenteId, rol: sesion.rol!,
+///            actorId: sesion.actorId!, posicionInicial: Ubicacion(lat, lon));
 /// // dispose:
 /// vm.detener();
 /// ```
@@ -67,6 +75,7 @@ class TrackingViewModel extends ChangeNotifier {
   // ── Internos ────────────────────────────────────────────────────────
   StreamSubscription<Ubicacion>? _gpsSubscription;
   String? _incidenteId;
+  String? _agenteId;
   String? _actorId;
   Rol? _rol;
 
@@ -74,46 +83,27 @@ class TrackingViewModel extends ChangeNotifier {
 
   /// Inicia el tracking para el incidente dado.
   ///
-  /// [posicionInicial]: posición del denunciante (para centrar el mapa).
+  /// [agenteId]: id del agente cuyo topic de ubicación se sigue. En modo
+  /// AGENTE (emisor) suele coincidir con [actorId] (el agente sigue su
+  /// propia posición); en modo CAI/Comando (receptor) es el agente
+  /// asignado al incidente, provisto por el caller.
+  /// [posicionInicial]: coordenadas del incidente (para centrar el mapa
+  /// y mostrar el marcador del punto de emergencia).
   Future<void> iniciar({
     required String incidenteId,
+    required String agenteId,
     required Rol rol,
     required String actorId,
     Ubicacion? posicionInicial,
   }) async {
     _incidenteId = incidenteId;
+    _agenteId = agenteId;
     _actorId = actorId;
     _rol = rol;
 
     if (posicionInicial != null) {
-      // posicionInicial = coordenadas del incidente (punto de la emergencia).
-      // Para el DENUNCIANTE, intentamos obtener su posición GPS actual para
-      // que el marcador naranja refleje dónde está él realmente.
-      // Si el GPS falla, NO usamos las coordenadas del incidente como fallback
-      // (coincidiría con el marcador rojo y quedaría tapado) — simplemente
-      // no mostramos el marcador naranja hasta que el GPS esté disponible.
-      if (rol == Rol.DENUNCIANTE) {
-        try {
-          // Solicitar permiso antes de obtener posición — TrackingView
-          // puede abrirse sin haber pasado por el botón de pánico (que es
-          // el único lugar donde se solicitaba el permiso antes).
-          final permiso = await _geo.solicitarPermiso();
-          if (permiso == PermisoGpsResultado.concedido) {
-            final posActual =
-                await _geo.obtenerPosicionActual(precisionAlta: false);
-            _posicionDenunciante =
-                LatLng(posActual.latitud, posActual.longitud);
-            notifyListeners();
-          }
-          // Si no se concede el permiso, _posicionDenunciante queda null
-          // y simplemente no se muestra el marcador naranja.
-        } catch (_) {
-          // GPS no disponible — marcador naranja no se muestra.
-        }
-      } else {
-        _posicionDenunciante =
-            LatLng(posicionInicial.latitud, posicionInicial.longitud);
-      }
+      _posicionDenunciante =
+          LatLng(posicionInicial.latitud, posicionInicial.longitud);
     }
 
     _setConexion(TrackingConexionEstado.conectando);
@@ -149,21 +139,29 @@ class TrackingViewModel extends ChangeNotifier {
     _errorMessage = null;
 
     switch (_rol) {
-      case Rol.DENUNCIANTE:
-        _iniciarModoReceptor();
       case Rol.AGENTE:
         _iniciarModoEmisor();
-      default:
-        // OPERADOR_CAI / COMANDO: solo reciben (misma lógica que denunciante)
+      case Rol.OPERADOR_CAI:
+      case Rol.COMANDO:
         _iniciarModoReceptor();
+      case Rol.DENUNCIANTE:
+      case null:
+        // Defensa en profundidad (fix P6): esta vista ya no es
+        // alcanzable por DENUNCIANTE — bloqueada en AppRoutes.tracking
+        // vía RouteGuard, y reemplazada por el widget de ETA en
+        // DetalleIncidenteView. Si por algún motivo se llegara hasta
+        // acá igual, no se abre ningún modo de tracking: el denunciante
+        // nunca debe recibir la posición GPS cruda del agente.
+        _errorMessage = 'No tiene acceso al seguimiento en tiempo real.';
+        _setConexion(TrackingConexionEstado.error);
     }
   }
 
-  // ── Modo receptor (denunciante / CAI / Comando) ─────────────────────
+  // ── Modo receptor (CAI / Comando) ────────────────────────────────────
 
   void _iniciarModoReceptor() {
-    _stomp.suscribirUbicacion(
-      incidenteId: _incidenteId!,
+    _stomp.suscribirUbicacionAgente(
+      agenteId: _agenteId!,
       onMensaje: (msg) {
         _posicionAgente = LatLng(msg.latitud, msg.longitud);
         notifyListeners();
@@ -174,8 +172,7 @@ class TrackingViewModel extends ChangeNotifier {
     // envío del agente (útil al abrir la vista o reconectar).
     _stomp.solicitarUltimaPosicion(
       incidenteId: _incidenteId!,
-      agenteId: _actorId!, // en modo receptor, actorId es del denunciante —
-      // el backend lo usa solo para loggear, no afecta funcionalidad.
+      agenteId: _agenteId!,
     );
   }
 
@@ -183,8 +180,8 @@ class TrackingViewModel extends ChangeNotifier {
 
   void _iniciarModoEmisor() {
     // También suscribir para ver la propia posición en el mapa (feedback).
-    _stomp.suscribirUbicacion(
-      incidenteId: _incidenteId!,
+    _stomp.suscribirUbicacionAgente(
+      agenteId: _agenteId!,
       onMensaje: (msg) {
         _posicionAgente = LatLng(msg.latitud, msg.longitud);
         notifyListeners();

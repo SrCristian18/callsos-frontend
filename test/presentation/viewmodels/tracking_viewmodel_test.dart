@@ -44,8 +44,9 @@ void main() {
       // No await completo — solo disparar
       unawaited(vm.iniciar(
         incidenteId: 'inc-001',
-        rol: Rol.DENUNCIANTE,
-        actorId: 'den-001',
+        agenteId: 'agente-001',
+        rol: Rol.AGENTE,
+        actorId: 'agente-001',
       ));
 
       expect(vm.conexion, TrackingConexionEstado.conectando);
@@ -64,8 +65,9 @@ void main() {
 
       await vm.iniciar(
         incidenteId: 'inc-001',
-        rol: Rol.DENUNCIANTE,
-        actorId: 'den-001',
+        agenteId: 'agente-001',
+        rol: Rol.AGENTE,
+        actorId: 'agente-001',
       );
 
       capturedOnError!('WebSocket unreachable');
@@ -75,7 +77,44 @@ void main() {
     });
   });
 
-  group('modo DENUNCIANTE (receptor)', () {
+  group('DENUNCIANTE bloqueado (fix P6, defensa en profundidad)', () {
+    // Épica 7: el rol DENUNCIANTE ya no debería llegar nunca hasta acá
+    // (bloqueado en AppRoutes.tracking vía RouteGuard, y sin botón que
+    // navegue aquí desde DetalleIncidenteView — reemplazado por
+    // EtaWidget). Este test cubre igual la defensa en profundidad
+    // DENTRO del viewmodel, por si alguna vez se llega hasta acá.
+    test('conectar con rol DENUNCIANTE no suscribe a ningún topic y pasa a error',
+        () async {
+      when(() => stomp.conectar(
+            onConnected: any(named: 'onConnected'),
+            onError: any(named: 'onError'),
+          )).thenAnswer((inv) async {
+        final onConnected = inv.namedArguments[const Symbol('onConnected')]
+            as OnConnected;
+        onConnected();
+      });
+
+      await vm.iniciar(
+        incidenteId: 'inc-001',
+        agenteId: 'agente-001',
+        rol: Rol.DENUNCIANTE,
+        actorId: 'den-001',
+      );
+
+      expect(vm.conexion, TrackingConexionEstado.error);
+      expect(vm.errorMessage, isNotNull);
+      verifyNever(() => stomp.suscribirUbicacionAgente(
+            agenteId: any(named: 'agenteId'),
+            onMensaje: any(named: 'onMensaje'),
+          ));
+      verifyNever(() => stomp.solicitarUltimaPosicion(
+            incidenteId: any(named: 'incidenteId'),
+            agenteId: any(named: 'agenteId'),
+          ));
+    });
+  });
+
+  group('modo OPERADOR_CAI / COMANDO (receptor)', () {
     late OnConnected capturedOnConnected;
     late void Function(UbicacionMensaje) capturedOnMensaje;
 
@@ -88,8 +127,8 @@ void main() {
             inv.namedArguments[const Symbol('onConnected')] as OnConnected;
       });
 
-      when(() => stomp.suscribirUbicacion(
-            incidenteId: any(named: 'incidenteId'),
+      when(() => stomp.suscribirUbicacionAgente(
+            agenteId: any(named: 'agenteId'),
             onMensaje: any(named: 'onMensaje'),
           )).thenAnswer((inv) {
         capturedOnMensaje = inv.namedArguments[const Symbol('onMensaje')]
@@ -102,32 +141,50 @@ void main() {
           )).thenReturn(null);
     });
 
-    test('al conectar suscribe al topic y solicita última posición', () async {
+    test('CAI: al conectar suscribe al topic del agente asignado y solicita última posición',
+        () async {
       await vm.iniciar(
         incidenteId: 'inc-001',
-        rol: Rol.DENUNCIANTE,
-        actorId: 'den-001',
+        agenteId: 'agente-999',
+        rol: Rol.OPERADOR_CAI,
+        actorId: 'cai-001',
       );
       capturedOnConnected();
 
       expect(vm.conexion, TrackingConexionEstado.conectado);
 
-      verify(() => stomp.suscribirUbicacion(
-            incidenteId: 'inc-001',
+      verify(() => stomp.suscribirUbicacionAgente(
+            agenteId: 'agente-999',
             onMensaje: any(named: 'onMensaje'),
           )).called(1);
 
       verify(() => stomp.solicitarUltimaPosicion(
             incidenteId: 'inc-001',
-            agenteId: any(named: 'agenteId'),
+            agenteId: 'agente-999',
+          )).called(1);
+    });
+
+    test('COMANDO: mismo comportamiento receptor que CAI', () async {
+      await vm.iniciar(
+        incidenteId: 'inc-001',
+        agenteId: 'agente-999',
+        rol: Rol.COMANDO,
+        actorId: 'comando-001',
+      );
+      capturedOnConnected();
+
+      verify(() => stomp.suscribirUbicacionAgente(
+            agenteId: 'agente-999',
+            onMensaje: any(named: 'onMensaje'),
           )).called(1);
     });
 
     test('mensaje STOMP recibido actualiza posicionAgente', () async {
       await vm.iniciar(
         incidenteId: 'inc-001',
-        rol: Rol.DENUNCIANTE,
-        actorId: 'den-001',
+        agenteId: 'agente-999',
+        rol: Rol.OPERADOR_CAI,
+        actorId: 'cai-001',
       );
       capturedOnConnected();
 
@@ -145,8 +202,9 @@ void main() {
     test('múltiples mensajes actualizan la posición con cada uno', () async {
       await vm.iniciar(
         incidenteId: 'inc-001',
-        rol: Rol.DENUNCIANTE,
-        actorId: 'den-001',
+        agenteId: 'agente-999',
+        rol: Rol.OPERADOR_CAI,
+        actorId: 'cai-001',
       );
       capturedOnConnected();
 
@@ -175,8 +233,8 @@ void main() {
             inv.namedArguments[const Symbol('onConnected')] as OnConnected;
       });
 
-      when(() => stomp.suscribirUbicacion(
-            incidenteId: any(named: 'incidenteId'),
+      when(() => stomp.suscribirUbicacionAgente(
+            agenteId: any(named: 'agenteId'),
             onMensaje: any(named: 'onMensaje'),
           )).thenReturn(null);
 
@@ -198,14 +256,20 @@ void main() {
 
     tearDown(() => gpsController.close());
 
-    test('al conectar inicia streamPosicion y envía cada posición al broker',
+    test('al conectar se suscribe a su propio topic (agenteId == actorId) e inicia streamPosicion',
         () async {
       await vm.iniciar(
         incidenteId: 'inc-001',
+        agenteId: 'agente-001',
         rol: Rol.AGENTE,
         actorId: 'agente-001',
       );
       capturedOnConnected();
+
+      verify(() => stomp.suscribirUbicacionAgente(
+            agenteId: 'agente-001',
+            onMensaje: any(named: 'onMensaje'),
+          )).called(1);
 
       // Simular dos actualizaciones de GPS
       gpsController.add(Ubicacion(latitud: 10.391, longitud: -75.4794));
@@ -231,6 +295,7 @@ void main() {
         () async {
       await vm.iniciar(
         incidenteId: 'inc-001',
+        agenteId: 'agente-001',
         rol: Rol.AGENTE,
         actorId: 'agente-001',
       );
@@ -253,8 +318,9 @@ void main() {
 
       await vm.iniciar(
         incidenteId: 'inc-001',
-        rol: Rol.DENUNCIANTE,
-        actorId: 'den-001',
+        agenteId: 'agente-001',
+        rol: Rol.AGENTE,
+        actorId: 'agente-001',
       );
 
       await vm.detener();
