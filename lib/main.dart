@@ -6,6 +6,7 @@
 import 'package:CallSos/core/app_config.dart';
 import 'package:CallSos/core/app_providers.dart';
 import 'package:CallSos/core/app_routes.dart';
+import 'package:CallSos/core/app_text_styles.dart';
 import 'package:CallSos/core/colores_app.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -77,6 +78,15 @@ class MyApp extends StatelessWidget {
         // `style:` explícito (ElevatedButton.styleFrom, decoración manual
         // en CustomInput), así que esto no las afecta; solo aplica como
         // default a widgets que no sobrescriban su estilo.
+        //
+        // EPIC-01 (Design System, auditoría UX/UI) agrega `error` al
+        // colorScheme y `textTheme` — mismo criterio de "no afecta nada
+        // existente": ningún widget actual lee `Theme.of(context).colorScheme.error`
+        // ni `.textTheme` (verificado con grep antes de agregar esto), así
+        // que son adiciones puras. `elevatedButtonTheme`/`inputDecorationTheme`
+        // de abajo NO se tocan en esta épica — sus valores literales (25, 15)
+        // se dejan exactamente como están para no arriesgar ni una
+        // regresión latente el día que algo empiece a heredarlos.
         theme: ThemeData(
           primarySwatch: Colors.green,
           scaffoldBackgroundColor: AppColors.blancoVerde,
@@ -86,7 +96,9 @@ class MyApp extends StatelessWidget {
             surface: AppColors.blancoVerde,
             onPrimary: Colors.white,
             onSecondary: Colors.white,
+            error: AppColors.error,
           ),
+          textTheme: AppTextStyles.textTheme,
           // Mismo patrón repetido en cada ElevatedButton.styleFrom de las
           // vistas actuales (login, register, home, reporte hallazgos):
           // ancho completo, esquinas redondeadas 25, fondo oscuro, texto
