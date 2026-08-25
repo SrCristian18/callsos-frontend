@@ -95,7 +95,13 @@ abstract class IIncidenteService {
 
   /// `PATCH /incidentes/{id}/en-camino` — el agente confirma que va en
   /// camino (`AGENTE_ASIGNADO` -> `AGENTE_EN_CAMINO`).
-  Future<void> enCamino(String id);
+  ///
+  /// [simular]: SOLO PRUEBAS PILOTO (ver `AppConfig.modoPruebaHabilitado`).
+  /// Si es `true`, manda `?simular=true` — el backend reemplaza el GPS
+  /// real por un recorrido simulado CAI → incidente (`SimularRecorridoAgenteService`).
+  /// Solo tiene efecto si el backend también tiene `simulacion.habilitada=true`;
+  /// en cualquier otro caso se ignora en el servidor.
+  Future<void> enCamino(String id, {bool simular = false});
 
   /// `PATCH /incidentes/{id}/atender` — el agente llega y comienza la
   /// atención (`AGENTE_EN_CAMINO` -> `EN_ATENCION`).
@@ -226,7 +232,10 @@ class IncidenteService implements IIncidenteService {
 
   @override
   Future<void> enCamino(String id) async {
-    await _client.patch('/incidentes/$id/en-camino');
+    final path = simular
+      ? '/incidentes/$id/en-camino?simular=true'
+      : '/incidentes/$id/en-camino';
+    await _client.patch(path);
   }
 
   @override
