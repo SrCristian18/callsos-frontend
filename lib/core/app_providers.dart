@@ -8,10 +8,12 @@ import 'package:CallSos/data/services/denunciante_service.dart';
 import 'package:CallSos/data/services/geolocalizacion_service.dart';
 import 'package:CallSos/data/services/incidente_service.dart';
 import 'package:CallSos/data/services/notificacion_service.dart';
+import 'package:CallSos/data/services/preferencias_storage.dart';
 import 'package:CallSos/data/services/reporte_service.dart';
 import 'package:CallSos/data/services/stomp_service.dart';
 import 'package:CallSos/presentation/viewmodels/crear_incidente_viewmodel.dart';
 import 'package:CallSos/presentation/viewmodels/sesion_viewmodel.dart';
+import 'package:CallSos/presentation/viewmodels/theme_viewmodel.dart';
 
 /// Épica 3 (integración funcional completa): se retiraron de este archivo
 /// los providers de LoginViewModel, ReporteViewModel,
@@ -33,6 +35,22 @@ class AppProviders {
       // ── F.0.6 — Geolocalización ─────────────────────────────────────
       Provider<IGeolocalizacionService>(
         create: (_) => GeolocalizacionService(),
+      ),
+
+      // ── EPIC-02 (Design System) — tema claro/oscuro ──────────────────
+      // Va temprano, sin depender de nada más (igual que Geolocalización)
+      // — MaterialApp lo necesita para decidir themeMode antes de
+      // construir cualquier pantalla.
+      ChangeNotifierProvider<ThemeViewModel>(
+        create: (_) {
+          final vm = ThemeViewModel(storage: SharedPreferencesAdapter());
+          // Fire-and-forget: mismo patrón que sesion.restaurarSesion()
+          // más abajo — no bloquea el primer build. Mientras se resuelve,
+          // themeMode ya vale ThemeMode.system (default del constructor),
+          // así que no hay parpadeo hacia un tema "vacío".
+          vm.cargarTemaGuardado();
+          return vm;
+        },
       ),
 
       // ── F.0.3 — Servicios de red ────────────────────────────────────
