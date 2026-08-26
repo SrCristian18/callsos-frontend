@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_config.dart';
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
 import '../../data/models/enums/estado_incidente.dart';
@@ -49,6 +50,11 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
   bool _isLoading = true;
   String? _error;
   bool _enProceso = false;
+
+  /// Espejo del mismo switch de `HomeAgenteView` — se muestra (y aplica)
+  /// solo si `AppConfig.modoPruebaHabilitado` es `true` en este build.
+  /// Ver el bloque "Modo prueba" dentro de `_botonesContextuales`.
+  bool _modoPrueba = false;
 
   late String _incidenteId;
 
@@ -375,12 +381,26 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
       // y "Ir en camino" quedaban pegados sin espacio cuando ambos
       // aplican a la vez (mismo estado AGENTE_ASIGNADO para AGENTE).
       if (botones.isNotEmpty) botones.add(const SizedBox(height: 10));
+
+      // Modo prueba (SOLO pruebas piloto): el switch solo se agrega a la
+      // lista de widgets si este build tiene el flag encendido — en
+      // producción este bloque nunca se construye.
+      if (AppConfig.modoPruebaHabilitado) {
+        botones.add(_switchModoPrueba());
+        botones.add(const SizedBox(height: 6));
+      }
+
       botones.add(_boton(
         label: '🚓 Ir en camino',
         color: Colors.blue.shade700,
         onPressed: () => _ejecutar(
-          () => service.enCamino(inc.id),
-          mensajeExito: 'Marcaste que vas en camino.',
+          () => service.enCamino(
+            inc.id,
+            simular: AppConfig.modoPruebaHabilitado && _modoPrueba,
+          ),
+          mensajeExito: _modoPrueba && AppConfig.modoPruebaHabilitado
+              ? 'Marcaste que vas en camino (simulado).'
+              : 'Marcaste que vas en camino.',
         ),
       ));
     }
@@ -454,6 +474,38 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
     await _ejecutar(
       () => service.actualizarTipo(inc.id, nuevoTipo),
       mensajeExito: 'Tipo de incidente actualizado.',
+    );
+  }
+
+  /// Switch "Modo prueba" — SOLO pruebas piloto (ver `AppConfig.modoPruebaHabilitado`).
+  /// Consistente con el mismo control en `HomeAgenteView`.
+  Widget _switchModoPrueba() {
+    return Container(
+      decoration: BoxDecoration(
+        color: _modoPrueba ? Colors.orange.shade100 : Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: SwitchListTile(
+        dense: true,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+        secondary: Icon(
+          Icons.science_outlined,
+          color: _modoPrueba ? Colors.orange.shade800 : Colors.grey.shade600,
+        ),
+        title: const Text(
+          'Modo prueba',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+        subtitle: Text(
+          _modoPrueba
+              ? 'Simulará el trayecto del CAI al incidente'
+              : 'Se usará el GPS real de este celular',
+          style: const TextStyle(fontSize: 11),
+        ),
+        value: _modoPrueba,
+        onChanged: (valor) => setState(() => _modoPrueba = valor),
+      ),
     );
   }
 
