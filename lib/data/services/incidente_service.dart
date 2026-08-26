@@ -231,7 +231,7 @@ class IncidenteService implements IIncidenteService {
   }
 
   @override
-  Future<void> enCamino(String id) async {
+  Future<void> enCamino(String id, {bool simular = false}) async {
     final path = simular
       ? '/incidentes/$id/en-camino?simular=true'
       : '/incidentes/$id/en-camino';
