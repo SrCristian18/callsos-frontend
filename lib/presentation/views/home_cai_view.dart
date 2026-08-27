@@ -13,6 +13,7 @@ import '../viewmodels/incidente_list_viewmodel.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_snackbar.dart';
 import '../widgets/incidente_card.dart';
+import '../widgets/logout_button.dart';
 import '../widgets/incidente_list_body.dart';
 
 /// Home del Operador CAI.
@@ -115,17 +116,7 @@ class _HomeCAIViewState extends State<HomeCAIView>
             ],
           ),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.logout, color: Colors.white),
-              tooltip: 'Cerrar sesión',
-              onPressed: () async {
-                await sesion.logout();
-                if (context.mounted) {
-                  Navigator.pushReplacementNamed(
-                      context, AppRoutes.roleSelection);
-                }
-              },
-            ),
+            const LogoutButton(),
           ],
           bottom: TabBar(
             controller: _tabs,

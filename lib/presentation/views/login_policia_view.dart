@@ -5,6 +5,7 @@ import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
 import '../../data/models/enums/rol.dart';
 import '../viewmodels/sesion_viewmodel.dart';
+import '../widgets/app_password_field.dart';
 import '../widgets/custom_input.dart';
 
 /// Login de roles policiales (Agente, Operador CAI, Comando).
@@ -119,10 +120,9 @@ class _LoginPoliciaViewState extends State<LoginPoliciaView> {
                     controller: _userController,
                   ),
 
-                  CustomInput(
+                  AppPasswordField(
                     hintText: "Contraseña",
                     icon: Icons.vpn_key_outlined,
-                    isPassword: true,
                     controller: _passwordController,
                   ),
 

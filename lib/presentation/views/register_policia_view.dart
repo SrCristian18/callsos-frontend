@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
 import '../viewmodels/sesion_viewmodel.dart';
+import '../widgets/app_password_field.dart';
 import '../widgets/custom_input.dart';
 
 /// Registro de agente mediante token de invitación generado por Comando.
@@ -132,16 +133,14 @@ class _RegisterPoliciaViewState extends State<RegisterPoliciaView> {
                     icon: Icons.person_outline,
                     controller: _usuarioController,
                   ),
-                  CustomInput(
+                  AppPasswordField(
                     hintText: 'Contraseña',
                     icon: Icons.lock_outline,
-                    isPassword: true,
                     controller: _passwordController,
                   ),
-                  CustomInput(
+                  AppPasswordField(
                     hintText: 'Confirmar contraseña',
                     icon: Icons.lock_outline,
-                    isPassword: true,
                     controller: _confirmarPasswordController,
                   ),
 
