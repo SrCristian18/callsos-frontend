@@ -85,6 +85,27 @@ class AppConfig {
   );
 
   // ───────────────────────────────────────────────────────────────────────
+  // Simulación de recorrido (SOLO pruebas piloto)
+  // ───────────────────────────────────────────────────────────────────────
+
+  /// Espejo de `simulacion.habilitada` en el backend (`application.yml`).
+  ///
+  /// Controla si el switch "Modo prueba" aparece en `HomeAgenteView`. Debe
+  /// quedar en `false` (default) en cualquier build que no sea para el
+  /// piloto — igual que en el backend, es un doble candado: aunque este
+  /// flag esté en `true` acá, si `simulacion.habilitada=false` en el
+  /// backend, el parámetro `simular=true` que manda esta app se ignora.
+  ///
+  /// Build para el piloto (dispositivo del tester haciendo de agente):
+  /// ```
+  /// flutter build apk --dart-define=MODO_PRUEBA_HABILITADO=true
+  /// ```
+  static const bool modoPruebaHabilitado = bool.fromEnvironment(
+    'MODO_PRUEBA_HABILITADO',
+    defaultValue: false,
+  );
+
+  // ───────────────────────────────────────────────────────────────────────
   // Firebase (F.5 — notificaciones push)
   // ───────────────────────────────────────────────────────────────────────
 

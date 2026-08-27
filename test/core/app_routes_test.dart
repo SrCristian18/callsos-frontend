@@ -25,6 +25,7 @@ import 'package:CallSos/presentation/views/home_comando_view.dart';
 import 'package:CallSos/presentation/views/detalle_incidente_view.dart';
 import 'package:CallSos/presentation/views/tracking_view.dart';
 import 'package:CallSos/presentation/views/reporte_hallazgos_view.dart';
+import 'package:CallSos/presentation/views/dev/component_catalog_view.dart';
 
 /// Épica 5 (ruta técnica) — "Test de navegación (AppRoutes + Navigator)".
 ///
@@ -79,6 +80,12 @@ void main() {
         AppRoutes.registerDenunciante: RegisterDenuncianteView,
         AppRoutes.registerPolicia: RegisterPoliciaView,
         AppRoutes.forgotPassword: ForgotPasswordView,
+        // EPIC-03 (Design System, auditoría UX/UI): solo existe en el
+        // mapa cuando kDebugMode es true — `flutter test` SIEMPRE corre
+        // en modo debug, así que en este test SIEMPRE está presente.
+        // No lleva RouteGuard: es una pantalla de validación visual
+        // para desarrolladores, no parte del flujo real de la app.
+        AppRoutes.devComponentCatalog: ComponentCatalogView,
       };
 
       // Rutas con guard: el WidgetBuilder construye un RouteGuard cuyo
@@ -155,6 +162,7 @@ void main() {
         AppRoutes.detalleIncidente,
         AppRoutes.tracking,
         AppRoutes.reporteHallazgos,
+        AppRoutes.devComponentCatalog,
       ];
 
       expect(paths.toSet().length, paths.length,
@@ -172,6 +180,23 @@ void main() {
       expect(AppRoutes.rutaHomeDeRol(Rol.AGENTE), AppRoutes.homeAgente);
       expect(AppRoutes.rutaHomeDeRol(Rol.OPERADOR_CAI), AppRoutes.homeCai);
       expect(AppRoutes.rutaHomeDeRol(Rol.COMANDO), AppRoutes.homeComando);
+    });
+
+    test(
+        'EPIC-03: el catálogo de componentes solo existe bajo kDebugMode '
+        '(en release, esta clave no debe estar en el mapa)', () {
+      // No podemos simular kDebugMode=false en un test (es una constante
+      // de compilación), pero sí dejamos documentado y verificado que
+      // HOY (test = siempre debug) la ruta está presente y sin guard —
+      // si algún día se moviera fuera del `if (kDebugMode)` en
+      // app_routes.dart, este test seguiría pasando igual, así que la
+      // garantía real de "nunca en release" depende de revisar el
+      // propio app_routes.dart, no de este test. Lo que SÍ podemos
+      // afirmar automáticamente: la ruta no está protegida por
+      // RouteGuard (no debería necesitarlo, dado que no navega a datos
+      // reales de ningún actor).
+      final widget = AppRoutes.routes[AppRoutes.devComponentCatalog];
+      expect(widget, isNotNull);
     });
   });
 

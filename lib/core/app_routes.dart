@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 import 'package:CallSos/presentation/views/splash_view.dart';
@@ -15,6 +16,7 @@ import 'package:CallSos/presentation/views/home_comando_view.dart';
 import 'package:CallSos/presentation/views/detalle_incidente_view.dart';
 import 'package:CallSos/presentation/views/tracking_view.dart';
 import 'package:CallSos/presentation/views/reporte_hallazgos_view.dart';
+import 'package:CallSos/presentation/views/dev/component_catalog_view.dart';
 import 'package:CallSos/data/models/enums/rol.dart';
 import 'route_guard.dart';
 
@@ -64,6 +66,13 @@ class AppRoutes {
   static const String detalleIncidente  = '/detalle_incidente';
   static const String tracking          = '/tracking';
   static const String reporteHallazgos  = '/reporte_hallazgos';
+
+  /// EPIC-03 (Design System, auditoría UX/UI) — solo alcanzable en
+  /// builds de debug (ver el `if (kDebugMode)` en [routes] más abajo).
+  /// Nunca aparece en un build de release, y no requiere [RouteGuard]:
+  /// es una pantalla de validación visual para desarrolladores, no
+  /// parte del flujo de la app.
+  static const String devComponentCatalog = '/dev/component_catalog';
 
   /// Home correspondiente a cada rol autenticado — usada por [SplashView]
   /// (destino tras restaurar sesión) y por [RouteGuard] (destino de
@@ -152,5 +161,12 @@ class AppRoutes {
                                     rolesPermitidos: _cualquierRolAutenticado,
                                     child: ReporteHallazgosView(),
                                   ),
+
+    // EPIC-03 — catálogo visual de componentes, solo en debug. Spread
+    // condicional: en un build de release, esta entrada directamente
+    // no existe en el mapa (no es que la ruta esté "bloqueada" — no
+    // está, ni ocupa espacio en el árbol de rutas compilado).
+    if (kDebugMode)
+      devComponentCatalog: (_) => const ComponentCatalogView(),
   };
 }

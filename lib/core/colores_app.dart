@@ -34,4 +34,12 @@ class AppColors{
   static const Color acentoAgente = Color(0xFF2C5F7C);
   static const Color acentoOperadorCai = Color(0xFF0F7B6C);
   static const Color acentoComando = Color(0xFF16223A);
+
+  // ── Dark mode (EPIC-02) ──────────────────────────────────────────────
+  // Valores tomados directamente de la propuesta de la auditoría UX/UI
+  // (sección 4.3): superficies invertidas derivadas de la MISMA paleta,
+  // no una paleta nueva — primary/secondary/error/etc. se mantienen
+  // iguales entre light y dark (ver main.dart), solo cambian los fondos.
+  static const Color fondoOscuro = Color(0xFF121820); // scaffold + surface
+  static const Color superficieOscura = Color(0xFF1B2531); // inputs, cards elevadas
 }
