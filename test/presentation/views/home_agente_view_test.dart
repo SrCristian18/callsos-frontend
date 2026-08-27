@@ -188,7 +188,9 @@ void main() {
     expect(find.text('detalle_incidente'), findsOneWidget);
   });
 
-  testWidgets('botón de logout cierra sesión y navega a roleSelection', (tester) async {
+  testWidgets(
+      'botón de logout muestra confirmación antes de cerrar sesión (fix hallazgo #2)',
+      (tester) async {
     when(() => incidenteService.asignados()).thenAnswer((_) async => []);
 
     await tester.pumpWidget(appDePrueba());
@@ -197,8 +199,30 @@ void main() {
     await tester.tap(find.byIcon(Icons.logout));
     await tester.pumpAndSettle();
 
+    expect(find.text('¿Cerrar sesión?'), findsOneWidget);
+    expect(sesion.isAuthenticated, isTrue);
+
+    await tester.tap(find.text('Cerrar sesión'));
+    await tester.pumpAndSettle();
+
     expect(sesion.isAuthenticated, isFalse);
     expect(find.text('role_selection'), findsOneWidget);
+  });
+
+  testWidgets('cancelar la confirmación de logout NO cierra la sesión',
+      (tester) async {
+    when(() => incidenteService.asignados()).thenAnswer((_) async => []);
+
+    await tester.pumpWidget(appDePrueba());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.logout));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+
+    expect(sesion.isAuthenticated, isTrue);
+    expect(find.text('role_selection'), findsNothing);
   });
 
   // Épica 8, Bloque 2, ítem 4 — al menos 1 test por IconButton crítico

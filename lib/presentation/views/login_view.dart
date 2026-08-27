@@ -7,6 +7,7 @@ import '../../core/colores_app.dart';
 import '../../data/models/enums/rol.dart';
 import '../../data/services/notificacion_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
+import '../widgets/app_password_field.dart';
 import '../widgets/custom_input.dart';
 
 /// Login del denunciante.
@@ -96,10 +97,9 @@ class _LoginViewState extends State<LoginView> {
                     controller: _userController,
                   ),
 
-                  CustomInput(
+                  AppPasswordField(
                     hintText: 'Contraseña',
                     icon: Icons.lock_outline,
-                    isPassword: true,
                     controller: _passwordController,
                   ),
 

@@ -7,6 +7,7 @@ import '../../core/colores_app.dart';
 import '../../data/models/enums/rol.dart';
 import '../../data/services/notificacion_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
+import '../widgets/app_password_field.dart';
 import '../widgets/custom_input.dart';
 
 /// Registro de denunciante.
@@ -129,16 +130,14 @@ class _RegisterDenuncianteViewState extends State<RegisterDenuncianteView> {
                     icon: Icons.phone_outlined,
                     controller: _celularController,
                   ),
-                  CustomInput(
+                  AppPasswordField(
                     hintText: 'Contraseña',
                     icon: Icons.lock_outline,
-                    isPassword: true,
                     controller: _passwordController,
                   ),
-                  CustomInput(
+                  AppPasswordField(
                     hintText: 'Confirmar contraseña',
                     icon: Icons.lock_outline,
-                    isPassword: true,
                     controller: _confirmarPasswordController,
                   ),
 

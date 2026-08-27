@@ -12,6 +12,7 @@ import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_snackbar.dart';
 import '../widgets/incidente_list_body.dart';
 import '../widgets/incidente_card.dart';
+import '../widgets/logout_button.dart';
 
 /// Home del denunciante.
 ///
@@ -69,17 +70,7 @@ class _HomeDenuncianteViewState extends State<HomeDenuncianteView> {
             ],
           ),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.logout, color: Colors.white),
-              tooltip: 'Cerrar sesión',
-              onPressed: () async {
-                await sesion.logout();
-                if (context.mounted) {
-                  Navigator.pushReplacementNamed(
-                      context, AppRoutes.roleSelection);
-                }
-              },
-            ),
+            const LogoutButton(),
           ],
         ),
         body: Consumer<IncidenteListViewModel>(
