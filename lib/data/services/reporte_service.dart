@@ -63,9 +63,15 @@ class ReporteAdministrativoResult {
 abstract class IReporteService {
   /// `POST /reportes/hallazgos` — el agente reporta hallazgos al finalizar
   /// la atención (F.4 — ReporteHallazgosView).
+  ///
+  /// FIX (Épica 8, hallazgo de seguridad #1): antes recibía un
+  /// `agenteId` explícito y lo mandaba en el body — el backend ahora
+  /// SIEMPRE usa el actor del JWT para determinar quién firma el
+  /// reporte (ver `ReporteController.crearHallazgos`), así que enviar
+  /// un valor aparte ya no tenía ningún efecto real, solo confundía.
+  /// Se retira el parámetro por completo.
   Future<ReporteHallazgosResult> crearHallazgos({
     required String incidenteId,
-    required String agenteId,
     required String descripcion,
   });
 
@@ -86,14 +92,12 @@ class ReporteService implements IReporteService {
   @override
   Future<ReporteHallazgosResult> crearHallazgos({
     required String incidenteId,
-    required String agenteId,
     required String descripcion,
   }) async {
     final data = await _client.post(
       '/reportes/hallazgos',
       data: {
         'incidenteId': incidenteId,
-        'agenteId': agenteId,
         'descripcion': descripcion,
       },
     );

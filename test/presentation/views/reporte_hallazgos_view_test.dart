@@ -82,13 +82,12 @@ void main() {
   });
 
   testWidgets(
-      'con descripción, envío exitoso llama crearHallazgos(incidenteId, agenteId, '
-      'descripcion) con el actorId de la sesión — NUNCA evaluar() (no existe '
-      'IIncidenteService en este árbol) — navega a HomeAgenteView limpiando el '
-      'stack y muestra el snackbar', (tester) async {
+      'con descripción, envío exitoso llama crearHallazgos(incidenteId, descripcion) '
+      '— el agenteId ya NO se envía en el body (Épica 8: el backend lo saca del '
+      'JWT) — NUNCA evaluar() (no existe IIncidenteService en este árbol) — navega '
+      'a HomeAgenteView limpiando el stack y muestra el snackbar', (tester) async {
     when(() => reporteService.crearHallazgos(
           incidenteId: 'i-001',
-          agenteId: 'ag-001',
           descripcion: 'Todo en orden al llegar.',
         )).thenAnswer((_) async => ReporteHallazgosResult(
           id: 'rep-001',
@@ -108,7 +107,6 @@ void main() {
 
     verify(() => reporteService.crearHallazgos(
           incidenteId: 'i-001',
-          agenteId: 'ag-001',
           descripcion: 'Todo en orden al llegar.',
         )).called(1);
     expect(find.text('home_agente'), findsOneWidget);
@@ -135,7 +133,6 @@ void main() {
   testWidgets('error de negocio del backend se muestra inline y NO navega', (tester) async {
     when(() => reporteService.crearHallazgos(
           incidenteId: any(named: 'incidenteId'),
-          agenteId: any(named: 'agenteId'),
           descripcion: any(named: 'descripcion'),
         )).thenThrow(const ApiException(
       type: ApiExceptionType.businessRule,
@@ -184,7 +181,6 @@ void main() {
     expect(find.byType(ReporteHallazgosView), findsNothing);
     verifyNever(() => reporteService.crearHallazgos(
           incidenteId: any(named: 'incidenteId'),
-          agenteId: any(named: 'agenteId'),
           descripcion: any(named: 'descripcion'),
         ));
   });

@@ -5,7 +5,6 @@ import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
 import '../../data/services/reporte_service.dart';
 import '../viewmodels/reporte_hallazgos_viewmodel.dart';
-import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_snackbar.dart';
 
 /// Formulario de reporte de hallazgos — completado por el agente al
@@ -61,10 +60,8 @@ class _ReporteHallazgosViewState extends State<ReporteHallazgosView> {
   }
 
   Future<void> _enviar() async {
-    final sesion = context.read<SesionViewModel>();
     final ok = await _vm.enviar(
       incidenteId: _incidenteId,
-      agenteId: sesion.actorId ?? '',
     );
 
     if (ok && mounted) {

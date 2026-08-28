@@ -15,7 +15,8 @@ void main() {
   });
 
   group('crearHallazgos', () {
-    test('envía el body correcto y mapea ReporteHallazgosResponse', () async {
+    test('envía el body sin agenteId (Épica 8: lo determina el backend vía JWT) '
+        'y mapea ReporteHallazgosResponse, que SÍ trae agenteId (informativo)', () async {
       when(() => client.post('/reportes/hallazgos', data: any(named: 'data')))
           .thenAnswer((_) async => {
                 'id': 'rep-001',
@@ -26,7 +27,6 @@ void main() {
 
       final resultado = await service.crearHallazgos(
         incidenteId: 'inc-001',
-        agenteId: 'agente-001',
         descripcion: 'Se atendió la riña, ambas partes calmadas.',
       );
 
@@ -35,9 +35,10 @@ void main() {
       expect(resultado.agenteId, 'agente-001');
       expect(resultado.fecha, DateTime.parse('2026-06-14T12:00:00'));
 
+      // El body NO lleva agenteId — ya no hay forma de que el cliente
+      // declare de quién es el reporte, el backend lo saca del JWT.
       verify(() => client.post('/reportes/hallazgos', data: {
             'incidenteId': 'inc-001',
-            'agenteId': 'agente-001',
             'descripcion': 'Se atendió la riña, ambas partes calmadas.',
           })).called(1);
     });
