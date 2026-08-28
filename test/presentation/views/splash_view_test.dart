@@ -193,4 +193,67 @@ void main() {
     // por error, este test lo detectaría porque reemplazos quedaría vacío.
     expect(observador.reemplazos, isNotEmpty);
   });
+
+  // ── EPIC-05 (auditoría UX/UI, hallazgo #7) ────────────────────────────
+
+  testWidgets('muestra una animación de apertura (fade/scale) sobre ícono y marca',
+      (tester) async {
+    final sesion = SesionViewModel(authService: authService, storage: storage);
+
+    await tester.pumpWidget(appDePrueba(sesion));
+
+    // Estructural — protege contra volver a la versión estática si
+    // alguien revierte el cambio sin darse cuenta.
+    //
+    // El ScaleTransition se busca como ANCESTRO puntual del ícono (no
+    // con findsOneWidget a nivel de árbol completo): Flutter agrega su
+    // propio ScaleTransition en la transición de entrada de ruta por
+    // defecto (ZoomPageTransitionsBuilder de Material en Android), que
+    // no tiene nada que ver con esta animación y haría fallar un conteo
+    // global.
+    expect(find.byType(FadeTransition), findsWidgets);
+    expect(
+      find.ancestor(
+        of: find.byIcon(Icons.emergency_share_rounded),
+        matching: find.byType(ScaleTransition),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+      'la navegación no espera a que la animación de apertura termine (no bloquea)',
+      (tester) async {
+    final sesion = SesionViewModel(authService: authService, storage: storage)
+      ..restaurarSesion();
+
+    await tester.pumpWidget(appDePrueba(sesion));
+    // Deja resolver el Future de restaurarSesion() y correr el
+    // addPostFrameCallback, SIN avanzar el reloj de animación lo
+    // suficiente como para que el fade/scale de apertura (~900ms)
+    // llegue a completarse — si la navegación estuviera erróneamente
+    // encadenada a que el AnimationController termine, estos dos
+    // pump() sin duración no alcanzarían para disparar `reemplazos`.
+    await tester.pump();
+    await tester.pump();
+
+    expect(observador.reemplazos, isNotEmpty);
+  });
+
+  testWidgets('la animación de apertura termina en menos de 1.5s (criterio de terminado)',
+      (tester) async {
+    final sesion = SesionViewModel(authService: authService, storage: storage);
+
+    await tester.pumpWidget(appDePrueba(sesion));
+    // Avanza el reloj exactamente 1499ms (justo por debajo del límite
+    // pedido) y verifica que, para ese entonces, la animación de
+    // apertura ya llegó a su valor final (opacidad 1.0) — no solo que
+    // "algo" se haya renderizado.
+    await tester.pump(const Duration(milliseconds: 1499));
+
+    final fades = tester.widgetList<FadeTransition>(find.byType(FadeTransition));
+    for (final fade in fades) {
+      expect(fade.opacity.value, 1.0);
+    }
+  });
 }
