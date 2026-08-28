@@ -5,13 +5,14 @@ import '../../core/app_config.dart';
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
 import '../../data/models/enums/estado_incidente.dart';
+import '../../data/models/enums/rol.dart';
 import '../../data/models/incidente.dart';
 import '../../data/services/incidente_service.dart';
 import '../viewmodels/incidente_list_viewmodel.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/incidente_card.dart';
 import '../widgets/incidente_list_body.dart';
-import '../widgets/logout_button.dart';
+import '../widgets/role_header.dart';
 
 /// Home del Agente de Policía.
 ///
@@ -120,23 +121,10 @@ class _HomeAgenteViewState extends State<HomeAgenteView> {
       value: _vm,
       child: Scaffold(
         backgroundColor: AppColors.blancoVerde,
-        appBar: AppBar(
-          backgroundColor: AppColors.negroTexto,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Mis asignaciones',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold)),
-              Text(sesion.nombreMostrar,
-                  style: const TextStyle(
-                      color: Colors.white70, fontSize: 12)),
-            ],
-          ),
-          actions: [
-            const LogoutButton(),
-          ],
+        appBar: RoleHeader(
+          rol: Rol.AGENTE,
+          titulo: 'Mis asignaciones',
+          subtitulo: sesion.nombreMostrar,
         ),
         body: Column(
           children: [

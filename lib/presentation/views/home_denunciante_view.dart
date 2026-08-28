@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
+import '../../data/models/enums/rol.dart';
 import '../../data/models/enums/tipo_incidente_enum.dart';
 import '../../data/models/tipo_incidente_presentacion.dart';
 import '../../data/services/incidente_service.dart';
@@ -12,7 +13,7 @@ import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_snackbar.dart';
 import '../widgets/incidente_list_body.dart';
 import '../widgets/incidente_card.dart';
-import '../widgets/logout_button.dart';
+import '../widgets/role_header.dart';
 
 /// Home del denunciante.
 ///
@@ -56,22 +57,10 @@ class _HomeDenuncianteViewState extends State<HomeDenuncianteView> {
       value: _listVm,
       child: Scaffold(
         backgroundColor: AppColors.blancoVerde,
-        appBar: AppBar(
-          backgroundColor: AppColors.verdeOscuro,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('CallSOS',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
-              Text(sesion.nombreMostrar,
-                  style:
-                      const TextStyle(color: Colors.white70, fontSize: 12)),
-            ],
-          ),
-          actions: [
-            const LogoutButton(),
-          ],
+        appBar: RoleHeader(
+          rol: Rol.DENUNCIANTE,
+          titulo: 'CallSOS',
+          subtitulo: sesion.nombreMostrar,
         ),
         body: Consumer<IncidenteListViewModel>(
           builder: (_, vm, _) => IncidenteListBody(
