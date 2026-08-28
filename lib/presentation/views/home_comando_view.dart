@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
 import '../../data/models/enums/estado_incidente.dart';
+import '../../data/models/enums/rol.dart';
 import '../../data/models/incidente.dart';
 import '../../data/models/invitacion_agente.dart';
 import '../../data/services/api_exception.dart';
@@ -13,7 +14,7 @@ import '../viewmodels/incidente_list_viewmodel.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_snackbar.dart';
 import '../widgets/incidente_card.dart';
-import '../widgets/logout_button.dart';
+import '../widgets/role_header.dart';
 import '../widgets/incidente_list_body.dart';
 
 /// Home de Comando.
@@ -205,26 +206,16 @@ class _HomeComandoViewState extends State<HomeComandoView>
       value: _vm,
       child: Scaffold(
         backgroundColor: AppColors.blancoVerde,
-        appBar: AppBar(
-          backgroundColor: AppColors.negroTexto,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Centro de Comando',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
-              Text(sesion.nombreMostrar,
-                  style:
-                      const TextStyle(color: Colors.white70, fontSize: 12)),
-            ],
-          ),
-          actions: [
+        appBar: RoleHeader(
+          rol: Rol.COMANDO,
+          titulo: 'Centro de Comando',
+          subtitulo: sesion.nombreMostrar,
+          extraActions: [
             IconButton(
               icon: const Icon(Icons.vpn_key_outlined, color: Colors.white),
               tooltip: 'Generar invitación de agente',
               onPressed: () => _mostrarGenerarInvitacion(context),
             ),
-            const LogoutButton(),
           ],
           bottom: TabBar(
             controller: _tabs,

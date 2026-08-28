@@ -47,13 +47,12 @@ void main() {
     test('llamada exitosa → estado exito, devuelve true', () async {
       when(() => service.crearHallazgos(
             incidenteId: any(named: 'incidenteId'),
-            agenteId: any(named: 'agenteId'),
             descripcion: any(named: 'descripcion'),
           )).thenAnswer((_) async => _fakeResultado());
 
       vm.descripcion = 'Se atendió el incidente sin novedades.';
       final ok =
-          await vm.enviar(incidenteId: 'inc-001', agenteId: 'agente-001');
+          await vm.enviar(incidenteId: 'inc-001');
 
       expect(ok, isTrue);
       expect(vm.estado, ReporteHallazgosEstado.exito);
@@ -63,16 +62,14 @@ void main() {
     test('envía la descripción recortada (trim)', () async {
       when(() => service.crearHallazgos(
             incidenteId: any(named: 'incidenteId'),
-            agenteId: any(named: 'agenteId'),
             descripcion: any(named: 'descripcion'),
           )).thenAnswer((_) async => _fakeResultado());
 
       vm.descripcion = '  descripción con espacios  ';
-      await vm.enviar(incidenteId: 'inc-001', agenteId: 'agente-001');
+      await vm.enviar(incidenteId: 'inc-001');
 
       final captured = verify(() => service.crearHallazgos(
             incidenteId: any(named: 'incidenteId'),
-            agenteId: any(named: 'agenteId'),
             descripcion: captureAny(named: 'descripcion'),
           )).captured.single as String;
 
@@ -81,12 +78,11 @@ void main() {
 
     test('descripción vacía → false sin llamar al servicio', () async {
       final ok =
-          await vm.enviar(incidenteId: 'inc-001', agenteId: 'agente-001');
+          await vm.enviar(incidenteId: 'inc-001');
 
       expect(ok, isFalse);
       verifyNever(() => service.crearHallazgos(
             incidenteId: any(named: 'incidenteId'),
-            agenteId: any(named: 'agenteId'),
             descripcion: any(named: 'descripcion'),
           ));
     });
@@ -98,7 +94,6 @@ void main() {
         () async {
       when(() => service.crearHallazgos(
             incidenteId: any(named: 'incidenteId'),
-            agenteId: any(named: 'agenteId'),
             descripcion: any(named: 'descripcion'),
           )).thenAnswer((_) => Future.error(const ApiException(
             type: ApiExceptionType.businessRule,
@@ -109,7 +104,7 @@ void main() {
 
       vm.descripcion = 'Descripción de prueba';
       final ok =
-          await vm.enviar(incidenteId: 'inc-001', agenteId: 'agente-001');
+          await vm.enviar(incidenteId: 'inc-001');
 
       expect(ok, isFalse);
       expect(vm.estado, ReporteHallazgosEstado.error);
@@ -119,7 +114,6 @@ void main() {
     test('sin conexión → estado error con mensaje de red', () async {
       when(() => service.crearHallazgos(
             incidenteId: any(named: 'incidenteId'),
-            agenteId: any(named: 'agenteId'),
             descripcion: any(named: 'descripcion'),
           )).thenAnswer((_) => Future.error(const ApiException(
             type: ApiExceptionType.noConnection,
@@ -128,7 +122,7 @@ void main() {
 
       vm.descripcion = 'Descripción de prueba';
       final ok =
-          await vm.enviar(incidenteId: 'inc-001', agenteId: 'agente-001');
+          await vm.enviar(incidenteId: 'inc-001');
 
       expect(ok, isFalse);
       expect(vm.estado, ReporteHallazgosEstado.error);
@@ -140,12 +134,11 @@ void main() {
     test('vuelve al estado idle limpiando todos los campos', () async {
       when(() => service.crearHallazgos(
             incidenteId: any(named: 'incidenteId'),
-            agenteId: any(named: 'agenteId'),
             descripcion: any(named: 'descripcion'),
           )).thenAnswer((_) async => _fakeResultado());
 
       vm.descripcion = 'texto';
-      await vm.enviar(incidenteId: 'inc-001', agenteId: 'agente-001');
+      await vm.enviar(incidenteId: 'inc-001');
       expect(vm.estado, ReporteHallazgosEstado.exito);
 
       vm.resetear();

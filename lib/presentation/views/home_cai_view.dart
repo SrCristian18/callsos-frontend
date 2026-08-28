@@ -5,6 +5,7 @@ import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
 import '../../data/models/agente_disponible.dart';
 import '../../data/models/enums/estado_incidente.dart';
+import '../../data/models/enums/rol.dart';
 import '../../data/models/incidente.dart';
 import '../../data/services/api_exception.dart';
 import '../../data/services/cai_service.dart';
@@ -13,7 +14,7 @@ import '../viewmodels/incidente_list_viewmodel.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_snackbar.dart';
 import '../widgets/incidente_card.dart';
-import '../widgets/logout_button.dart';
+import '../widgets/role_header.dart';
 import '../widgets/incidente_list_body.dart';
 
 /// Home del Operador CAI.
@@ -101,23 +102,10 @@ class _HomeCAIViewState extends State<HomeCAIView>
       value: _vm,
       child: Scaffold(
         backgroundColor: AppColors.blancoVerde,
-        appBar: AppBar(
-          backgroundColor: Colors.green.shade700,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Panel CAI',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold)),
-              Text(sesion.nombreMostrar,
-                  style: const TextStyle(
-                      color: Colors.white70, fontSize: 12)),
-            ],
-          ),
-          actions: [
-            const LogoutButton(),
-          ],
+        appBar: RoleHeader(
+          rol: Rol.OPERADOR_CAI,
+          titulo: 'Panel CAI',
+          subtitulo: sesion.nombreMostrar,
           bottom: TabBar(
             controller: _tabs,
             indicatorColor: Colors.white,
