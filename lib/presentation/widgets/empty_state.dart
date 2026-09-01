@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 /// UX/UI).
 ///
 /// Extrae el bloque ícono+mensaje que hoy se repite en
-/// `incidente_list_body.dart` (lista vacía de incidentes) y que las
-/// futuras listas (historial, auditoría) necesitarán igual. No se
-/// conecta a ninguna vista existente en esta épica — EPIC-04.
+/// `incidente_list_body.dart` (lista vacía de incidentes). Desde
+/// EPIC-07 también lo usa `Timeline` (tab "Historial" de
+/// `DetalleIncidenteView`) cuando un incidente todavía no tiene eventos
+/// de auditoría registrados.
 ///
 /// Uso:
 /// ```dart

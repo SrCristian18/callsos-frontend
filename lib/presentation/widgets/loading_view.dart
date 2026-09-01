@@ -7,8 +7,9 @@ import '../../core/colores_app.dart';
 ///
 /// Extrae el spinner centrado que hoy se repite, casi idéntico, en
 /// `incidente_list_body.dart` (`vm.isLoading`), `tracking_view.dart` y
-/// otros lugares que cargan datos antes de mostrar la pantalla. No se
-/// conecta a ninguna vista existente en esta épica — EPIC-04.
+/// otros lugares que cargan datos antes de mostrar la pantalla. Desde
+/// EPIC-07 también lo usa `Timeline` (tab "Historial" de
+/// `DetalleIncidenteView`).
 ///
 /// Uso:
 /// ```dart

@@ -4,12 +4,14 @@ import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 
 import 'package:CallSos/core/app_routes.dart';
+import 'package:CallSos/data/models/auditoria_incidente.dart';
 import 'package:CallSos/data/models/auth_result.dart';
 import 'package:CallSos/data/models/enums/estado_incidente.dart';
 import 'package:CallSos/data/models/enums/rol.dart';
 import 'package:CallSos/data/models/enums/tipo_incidente_enum.dart';
 import 'package:CallSos/data/models/incidente.dart';
 import 'package:CallSos/data/services/api_exception.dart';
+import 'package:CallSos/data/services/auditoria_service.dart';
 import 'package:CallSos/data/services/auth_service.dart';
 import 'package:CallSos/data/services/incidente_service.dart';
 import 'package:CallSos/data/services/secure_storage.dart';
@@ -32,6 +34,10 @@ import 'package:CallSos/presentation/views/detalle_incidente_view.dart';
 class MockAuthService extends Mock implements IAuthService {}
 
 class MockIncidenteService extends Mock implements IIncidenteService {}
+
+/// EPIC-07 — mock del servicio de auditoría que consume la nueva pestaña
+/// "Historial" (`Timeline`, ver `timeline.dart`).
+class MockAuditoriaService extends Mock implements IAuditoriaService {}
 
 /// FIX: `EtaWidget` ahora lee `IStompService` desde el Provider
 /// (`context.read<IStompService>()`) en vez de instanciar `StompService`
@@ -71,6 +77,7 @@ Incidente _fake(String id, EstadoIncidente estado,
 void main() {
   late MockAuthService authService;
   late MockIncidenteService incidenteService;
+  late MockAuditoriaService auditoriaService;
   late MockStompService stompService;
   late SesionViewModel sesion;
 
@@ -94,6 +101,14 @@ void main() {
     incidenteService = MockIncidenteService();
     sesion = SesionViewModel(authService: authService, storage: FakeSecureStorage());
 
+    // EPIC-07: stub por defecto — lista vacía. Los tests del bloque
+    // "Historial" lo sobrescriben cuando necesitan datos/error
+    // específicos. Sin este default, cualquier test que llegue a
+    // construir la pestaña "Historial" (aunque no la esté probando a
+    // propósito) fallaría con un MissingStubError.
+    auditoriaService = MockAuditoriaService();
+    when(() => auditoriaService.historial(any())).thenAnswer((_) async => []);
+
     // Stubs mínimos para que EtaWidget (si llega a montarse — solo
     // ocurre con DENUNCIANTE + AGENTE_EN_CAMINO) no reciba llamadas sin
     // estubear. conectar() nunca invoca onConnected/onError aquí — el
@@ -111,6 +126,7 @@ void main() {
     return MultiProvider(
       providers: [
         Provider<IIncidenteService>.value(value: incidenteService),
+        Provider<IAuditoriaService>.value(value: auditoriaService),
         Provider<IStompService>.value(value: stompService),
         ChangeNotifierProvider<SesionViewModel>.value(value: sesion),
       ],
@@ -500,6 +516,161 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => incidenteService.consultar('i-001')).called(2);
+  });
+
+  // EPIC-07 — pestaña "Historial" (Timeline de auditoría).
+  group('Historial (EPIC-07)', () {
+    testWidgets('mientras carga el incidente, no muestra TabBar todavía '
+        '(sin bottom en el AppBar)', (tester) async {
+      await loguearComo('com-001', Rol.COMANDO);
+      when(() => incidenteService.consultar('i-001')).thenAnswer(
+        (_) => Future.delayed(
+            const Duration(milliseconds: 500),
+            () => _fake('i-001', EstadoIncidente.CREADO)),
+      );
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pump();
+
+      expect(find.text('Historial'), findsNothing);
+
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('una vez cargado el incidente, aparecen las pestañas '
+        '"Detalle" y "Historial"', (tester) async {
+      await loguearComo('com-001', Rol.COMANDO);
+      when(() => incidenteService.consultar('i-001'))
+          .thenAnswer((_) async => _fake('i-001', EstadoIncidente.CREADO));
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Detalle'), findsOneWidget);
+      expect(find.text('Historial'), findsOneWidget);
+    });
+
+    testWidgets('tocar "Historial" muestra los eventos de auditoría del '
+        'incidente (GET /auditoria/incidente/{id})', (tester) async {
+      await loguearComo('com-001', Rol.COMANDO);
+      when(() => incidenteService.consultar('i-001'))
+          .thenAnswer((_) async => _fake('i-001', EstadoIncidente.DERIVADO_A_CAI));
+      when(() => auditoriaService.historial('i-001')).thenAnswer((_) async => [
+            AuditoriaIncidente(
+              incidenteId: 'i-001',
+              estadoNuevo: EstadoIncidente.CREADO,
+              actorId: 'den-001',
+              actorRol: 'DENUNCIANTE',
+              timestamp: DateTime(2026, 6, 14, 10, 0),
+              detalle: 'Incidente creado.',
+            ),
+            AuditoriaIncidente(
+              incidenteId: 'i-001',
+              estadoAnterior: EstadoIncidente.CREADO,
+              estadoNuevo: EstadoIncidente.DERIVADO_A_CAI,
+              actorId: 'com-001',
+              actorRol: 'COMANDO',
+              timestamp: DateTime(2026, 6, 14, 10, 5),
+              detalle: 'Derivado al CAI más cercano.',
+            ),
+          ]);
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Historial'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Incidente creado.'), findsOneWidget);
+      expect(find.text('Derivado al CAI más cercano.'), findsOneWidget);
+      verify(() => auditoriaService.historial('i-001')).called(1);
+    });
+
+    testWidgets('sin eventos todavía, la pestaña Historial muestra el '
+        'estado vacío', (tester) async {
+      await loguearComo('com-001', Rol.COMANDO);
+      when(() => incidenteService.consultar('i-001'))
+          .thenAnswer((_) async => _fake('i-001', EstadoIncidente.CREADO));
+      when(() => auditoriaService.historial('i-001')).thenAnswer((_) async => []);
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Historial'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Todavía no hay eventos registrados.'), findsOneWidget);
+    });
+
+    testWidgets('si el backend rechaza (403 — el actor no está autorizado '
+        'sobre este incidente), la pestaña Historial muestra el error, sin '
+        'afectar la pestaña Detalle', (tester) async {
+      await loguearComo('ag-999', Rol.AGENTE);
+      when(() => incidenteService.consultar('i-001')).thenAnswer(
+          (_) async => _fake('i-001', EstadoIncidente.AGENTE_ASIGNADO));
+      when(() => auditoriaService.historial('i-001')).thenThrow(
+        const ApiException(
+          type: ApiExceptionType.forbidden,
+          message:
+              'No tiene autorización para consultar la auditoría de este incidente.',
+        ),
+      );
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Historial'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('No tiene autorización para consultar la auditoría de este incidente.'),
+        findsOneWidget,
+      );
+
+      // La pestaña "Detalle" sigue intacta — el 403 de auditoría no
+      // afecta el resto de la vista (fuentes de datos independientes).
+      await tester.tap(find.text('Detalle'));
+      await tester.pumpAndSettle();
+      expect(find.text('Robos o asaltos'), findsWidgets);
+    });
+
+    testWidgets('los 4 roles pueden abrir la pestaña Historial — el '
+        'filtrado real de autorización vive en el backend, no acá',
+        (tester) async {
+      for (final entry in {
+        'den-001': Rol.DENUNCIANTE,
+        'ag-001': Rol.AGENTE,
+        'cai-001': Rol.OPERADOR_CAI,
+        'com-001': Rol.COMANDO,
+      }.entries) {
+        await loguearComo(entry.key, entry.value);
+        when(() => incidenteService.consultar('i-001'))
+            .thenAnswer((_) async => _fake('i-001', EstadoIncidente.CREADO));
+        when(() => auditoriaService.historial('i-001')).thenAnswer((_) async => [
+              AuditoriaIncidente(
+                incidenteId: 'i-001',
+                estadoNuevo: EstadoIncidente.CREADO,
+                actorId: entry.key,
+                actorRol: entry.value.name,
+                timestamp: DateTime(2026, 6, 14, 10, 0),
+                detalle: 'Incidente creado.',
+              ),
+            ]);
+
+        await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Historial'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Incidente creado.'), findsOneWidget,
+            reason: 'Falló para el rol ${entry.value.name}');
+
+        // Limpieza entre iteraciones del loop.
+        await tester.pumpWidget(const SizedBox());
+        await sesion.logout();
+      }
+    });
   });
 
   // Bloque 4 (Épica 8) — pantalla chica + texto largo.
