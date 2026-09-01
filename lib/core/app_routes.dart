@@ -16,6 +16,7 @@ import 'package:CallSos/presentation/views/home_comando_view.dart';
 import 'package:CallSos/presentation/views/detalle_incidente_view.dart';
 import 'package:CallSos/presentation/views/tracking_view.dart';
 import 'package:CallSos/presentation/views/reporte_hallazgos_view.dart';
+import 'package:CallSos/presentation/views/ajustes_view.dart';
 import 'package:CallSos/presentation/views/dev/component_catalog_view.dart';
 import 'package:CallSos/data/models/enums/rol.dart';
 import 'route_guard.dart';
@@ -34,6 +35,7 @@ import 'route_guard.dart';
 ///   `/home_comando`.
 /// - Flujo de incidente: `/detalle_incidente`, `/tracking`,
 ///   `/reporte_hallazgos`.
+/// - Ajustes: `/ajustes` (EPIC-08).
 ///
 /// Épica 3 (integración funcional completa): se retiraron las rutas legacy
 /// `/incident_view` y `/report_view` — llevaban a pantallas con datos mock
@@ -66,6 +68,14 @@ class AppRoutes {
   static const String detalleIncidente  = '/detalle_incidente';
   static const String tracking          = '/tracking';
   static const String reporteHallazgos  = '/reporte_hallazgos';
+
+  /// EPIC-08 (Design System, auditoría UX/UI) — pantalla de Ajustes,
+  /// alcanzable desde el ícono nuevo en [RoleHeader] de los 4 roles
+  /// (ver criterio de terminado de la épica). Protegida con el mismo
+  /// set de roles que el flujo de incidente (`_cualquierRolAutenticado`):
+  /// cualquier rol autenticado puede ver/cambiar SU tema y cerrar SU
+  /// sesión, no hay nada específico de un rol en particular.
+  static const String ajustes = '/ajustes';
 
   /// EPIC-03 (Design System, auditoría UX/UI) — solo alcanzable en
   /// builds de debug (ver el `if (kDebugMode)` en [routes] más abajo).
@@ -160,6 +170,12 @@ class AppRoutes {
     reporteHallazgos:     (_) => const RouteGuard(
                                     rolesPermitidos: _cualquierRolAutenticado,
                                     child: ReporteHallazgosView(),
+                                  ),
+
+    // EPIC-08 — Ajustes, cualquier rol autenticado.
+    ajustes:              (_) => const RouteGuard(
+                                    rolesPermitidos: _cualquierRolAutenticado,
+                                    child: AjustesView(),
                                   ),
 
     // EPIC-03 — catálogo visual de componentes, solo en debug. Spread

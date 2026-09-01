@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
 import '../../data/models/enums/rol.dart';
 import 'logout_button.dart';
@@ -28,6 +29,13 @@ import 'logout_button.dart';
 /// También incluye el [LogoutButton] (con confirmación, EPIC-04)
 /// siempre al final de las acciones — ninguna Home necesita agregarlo
 /// por su cuenta.
+///
+/// Desde EPIC-08 (Ajustes/Configuración) también incluye SIEMPRE, justo
+/// antes del [LogoutButton], el ícono de entrada a `AjustesView` — es
+/// el único punto de acceso a esa pantalla en toda la app, y al vivir
+/// acá (igual que el logout) las 4 Home lo obtienen automáticamente sin
+/// tener que agregarlo cada una por su cuenta (criterio de terminado de
+/// la épica: "los 4 roles acceden a Ajustes desde su header").
 ///
 /// Implementa [PreferredSizeWidget] (igual que `AppBar`) para poder
 /// usarse directamente como `Scaffold.appBar:`, incluyendo el alto
@@ -109,6 +117,11 @@ class RoleHeader extends StatelessWidget implements PreferredSizeWidget {
       ),
       actions: [
         ...extraActions,
+        IconButton(
+          icon: const Icon(Icons.settings_outlined, color: Colors.white),
+          tooltip: 'Ajustes',
+          onPressed: () => Navigator.pushNamed(context, AppRoutes.ajustes),
+        ),
         const LogoutButton(),
       ],
       bottom: bottom,

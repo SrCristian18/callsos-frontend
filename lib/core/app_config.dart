@@ -130,4 +130,22 @@ class AppConfig {
     'FIREBASE_ENABLED',
     defaultValue: false,
   );
+
+  // ───────────────────────────────────────────────────────────────────────
+  // Metadatos de la app (EPIC-08 — Ajustes / Configuración)
+  // ───────────────────────────────────────────────────────────────────────
+
+  /// Versión visible en `AjustesView` (heurística #10 — ayuda y
+  /// documentación: la versión instalada debe ser fácil de encontrar,
+  /// por ejemplo para reportar un bug).
+  ///
+  /// Espejo manual del campo `version:` de `pubspec.yaml` — se eligió
+  /// una constante simple en vez de agregar `package_info_plus` (que
+  /// leería el valor real del bundle nativo) para no sumar una
+  /// dependencia nueva solo para mostrar un texto informativo; ver
+  /// "No modificar" de EPIC-08 (nada que requiera configuración nueva
+  /// de build/backend). Costo: hay que actualizar este valor a mano
+  /// cada vez que cambie `pubspec.yaml` — documentado acá para que no
+  /// se desincronicen en silencio.
+  static const String appVersion = '1.0.0';
 }
