@@ -15,6 +15,7 @@ import '../widgets/app_snackbar.dart';
 import '../widgets/estado_chip.dart';
 import '../widgets/eta_widget.dart';
 import '../widgets/selector_tipo_incidente.dart';
+import '../widgets/timeline.dart';
 
 /// Detalle completo de un incidente.
 ///
@@ -45,11 +46,21 @@ class DetalleIncidenteView extends StatefulWidget {
   State<DetalleIncidenteView> createState() => _DetalleIncidenteViewState();
 }
 
-class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
+class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
+    with SingleTickerProviderStateMixin {
   Incidente? _incidente;
   bool _isLoading = true;
   String? _error;
   bool _enProceso = false;
+
+  /// EPIC-07 — tab "Detalle" / "Historial". Vive en el State (no
+  /// `DefaultTabController`) para que la pestaña elegida sobreviva a los
+  /// `setState()` que dispara `_ejecutar()` tras cada acción (ej.
+  /// "Ir en camino"): con `DefaultTabController` el widget se
+  /// reconstruye completo en cada rebuild del árbol y la selección
+  /// vuelve siempre a la pestaña 0.
+  late final TabController _tabController =
+      TabController(length: 2, vsync: this);
 
   /// Espejo del mismo switch de `HomeAgenteView` — se muestra (y aplica)
   /// solo si `AppConfig.modoPruebaHabilitado` es `true` en este build.
@@ -74,6 +85,12 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
   /// contexto todavía no tiene acceso a los InheritedWidgets de rutas),
   /// pero la CARGA (`_cargar()`) solo debe dispararse la primera vez.
   bool _yaCargado = false;
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -154,6 +171,22 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
             onPressed: _isLoading ? null : _cargar,
           ),
         ],
+        // EPIC-07: la pestaña "Historial" solo tiene sentido una vez que
+        // el incidente cargó (necesita `inc.id`) — mientras está en
+        // loading/error no se muestra TabBar, así el usuario no ve una
+        // pestaña que llevaría a un widget sin datos que mostrar todavía.
+        bottom: _incidente != null
+            ? TabBar(
+                controller: _tabController,
+                indicatorColor: Colors.white,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white70,
+                tabs: const [
+                  Tab(text: 'Detalle', icon: Icon(Icons.info_outline)),
+                  Tab(text: 'Historial', icon: Icon(Icons.history)),
+                ],
+              )
+            : null,
       ),
       body: _buildBody(),
     );
@@ -201,6 +234,23 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView> {
     final service = context.read<IIncidenteService>();
     final pres = catalogoTipos[inc.tipo];
 
+    // EPIC-07: tab "Detalle" (contenido ya existente, sin cambios) +
+    // tab "Historial" (nuevo — `Timeline`, ver `timeline.dart`). El
+    // endpoint de auditoría ya viene filtrado por actor en el backend
+    // (`AuditoriaController`), así que `Timeline` no necesita saber el
+    // rol de la sesión: cada actor ve exactamente lo que el servidor le
+    // autoriza, sin lógica adicional acá.
+    return TabBarView(
+      controller: _tabController,
+      children: [
+        _buildDetalle(inc, rol, service, sesion, pres),
+        Timeline(incidenteId: inc.id),
+      ],
+    );
+  }
+
+  Widget _buildDetalle(Incidente inc, Rol? rol, IIncidenteService service,
+      SesionViewModel sesion, TipoIncidentePresentacion? pres) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(

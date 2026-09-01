@@ -8,8 +8,8 @@ import '../../core/colores_app.dart';
 /// Extrae el bloque ícono+mensaje+"Reintentar" que hoy se repite,
 /// prácticamente idéntico, en `incidente_list_body.dart` y
 /// `tracking_view.dart` (mismo ícono `wifi_off_outlined`, mismo tamaño
-/// 52, mismos tonos de gris). No se conecta a ninguna vista existente
-/// en esta épica — EPIC-04.
+/// 52, mismos tonos de gris). Desde EPIC-07 también lo usa `Timeline`
+/// (tab "Historial" de `DetalleIncidenteView`).
 ///
 /// Uso:
 /// ```dart

@@ -2,6 +2,7 @@ import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
 import 'package:CallSos/data/services/api_client.dart';
+import 'package:CallSos/data/services/auditoria_service.dart';
 import 'package:CallSos/data/services/auth_service.dart';
 import 'package:CallSos/data/services/cai_service.dart';
 import 'package:CallSos/data/services/denunciante_service.dart';
@@ -65,6 +66,10 @@ class AppProviders {
       ),
       Provider<ICaiService>(
         create: (_) => CaiService(apiClient),
+      ),
+      // ── EPIC-07 — Auditorías e historiales (Timeline) ────────────────
+      Provider<IAuditoriaService>(
+        create: (_) => AuditoriaService(apiClient),
       ),
 
       // ── F.5 — Notificaciones push ───────────────────────────────────
