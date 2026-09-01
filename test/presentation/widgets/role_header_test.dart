@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show Ticker, TickerCallback;
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:CallSos/core/app_routes.dart';
 import 'package:CallSos/core/colores_app.dart';
 import 'package:CallSos/data/models/enums/rol.dart';
 import 'package:CallSos/presentation/widgets/logout_button.dart';
@@ -84,7 +85,8 @@ void main() {
       expect(find.byType(LogoutButton), findsOneWidget);
     });
 
-    testWidgets('extraActions se muestran ANTES del LogoutButton', (tester) async {
+    testWidgets('extraActions se muestran ANTES del ícono de Ajustes y del LogoutButton',
+        (tester) async {
       await tester.pumpWidget(envolver(RoleHeader(
         rol: Rol.COMANDO,
         titulo: 'Centro de Comando',
@@ -101,18 +103,50 @@ void main() {
       final acciones = tester
           .widget<AppBar>(find.byType(AppBar))
           .actions!;
-      expect(acciones.length, 2);
+      expect(acciones.length, 3);
       expect(acciones.last, isA<LogoutButton>());
     });
 
-    testWidgets('sin extraActions, la única acción es LogoutButton', (tester) async {
+    testWidgets('sin extraActions, las acciones son Ajustes + LogoutButton', (tester) async {
       await tester.pumpWidget(envolver(const RoleHeader(
         rol: Rol.DENUNCIANTE, titulo: 'X', subtitulo: 'Y',
       )));
 
       final acciones = tester.widget<AppBar>(find.byType(AppBar)).actions!;
-      expect(acciones.length, 1);
-      expect(acciones.single, isA<LogoutButton>());
+      expect(acciones.length, 2);
+      expect(acciones.last, isA<LogoutButton>());
+    });
+  });
+
+  group('RoleHeader — entrada a Ajustes (EPIC-08)', () {
+    testWidgets('los 4 roles muestran el ícono de Ajustes en su header', (tester) async {
+      for (final rol in Rol.values) {
+        await tester.pumpWidget(envolver(RoleHeader(
+          rol: rol, titulo: 'X', subtitulo: 'Y',
+        )));
+
+        expect(
+          find.widgetWithIcon(IconButton, Icons.settings_outlined),
+          findsOneWidget,
+          reason: 'El rol $rol debería tener el ícono de Ajustes en su header',
+        );
+      }
+    });
+
+    testWidgets('tocar el ícono de Ajustes navega a AppRoutes.ajustes', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          appBar: const RoleHeader(rol: Rol.AGENTE, titulo: 'X', subtitulo: 'Y'),
+        ),
+        routes: {
+          AppRoutes.ajustes: (_) => const Scaffold(body: Text('ajustes')),
+        },
+      ));
+
+      await tester.tap(find.widgetWithIcon(IconButton, Icons.settings_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ajustes'), findsOneWidget);
     });
   });
 

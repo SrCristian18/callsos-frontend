@@ -25,6 +25,7 @@ import 'package:CallSos/presentation/views/home_comando_view.dart';
 import 'package:CallSos/presentation/views/detalle_incidente_view.dart';
 import 'package:CallSos/presentation/views/tracking_view.dart';
 import 'package:CallSos/presentation/views/reporte_hallazgos_view.dart';
+import 'package:CallSos/presentation/views/ajustes_view.dart';
 import 'package:CallSos/presentation/views/dev/component_catalog_view.dart';
 
 /// Épica 5 (ruta técnica) — "Test de navegación (AppRoutes + Navigator)".
@@ -111,6 +112,11 @@ void main() {
           ReporteHallazgosView,
           {Rol.DENUNCIANTE, Rol.AGENTE, Rol.OPERADOR_CAI, Rol.COMANDO}
         ),
+        // EPIC-08 — Ajustes, cualquier rol autenticado.
+        AppRoutes.ajustes: (
+          AjustesView,
+          {Rol.DENUNCIANTE, Rol.AGENTE, Rol.OPERADOR_CAI, Rol.COMANDO}
+        ),
       };
 
       final routes = AppRoutes.routes;
@@ -162,6 +168,7 @@ void main() {
         AppRoutes.detalleIncidente,
         AppRoutes.tracking,
         AppRoutes.reporteHallazgos,
+        AppRoutes.ajustes,
         AppRoutes.devComponentCatalog,
       ];
 
