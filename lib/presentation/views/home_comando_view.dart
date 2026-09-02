@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_radius.dart';
 import '../../core/app_routes.dart';
+import '../../core/app_spacing.dart';
+import '../../core/app_text_styles.dart';
 import '../../core/colores_app.dart';
 import '../../data/models/enums/estado_incidente.dart';
 import '../../data/models/enums/rol.dart';
@@ -25,6 +28,27 @@ import '../widgets/incidente_list_body.dart';
 /// por actorId — el único endpoint que tiene sentido para COMANDO.
 ///
 /// Tabs: "Reportados" (CREADO) / "Delegados" (resto).
+///
+/// EPIC-12 (Design System, auditoría UX/UI) — "Experiencia del
+/// Comandante":
+/// - "Reportados" ya hereda el Design System de EPIC-09/EPIC-11 a
+///   través de [IncidenteCard]/[IncidenteListBody] (componentes
+///   compartidos); acá se migran además el sheet de derivación
+///   ([_BottomSheetDerivar]) a los tokens de EPIC-01
+///   (`AppSpacing`/`AppRadius`/`AppTextStyles`), por consistencia.
+/// - "Delegados" reemplaza el aviso plano de antes por un panel
+///   claramente marcado como "función pendiente de backend" (ver
+///   [_avisoDelegadosPendiente]) — heurística #1 (visibilidad del
+///   estado del sistema): un tab vacío se confunde con "no hay datos
+///   todavía"; este panel dice explícitamente que la función no está
+///   construida y por qué, en vez de disfrazarla de lista vacía.
+///
+/// REQUIERE CAMBIO DE BACKEND (hallazgo #14, fuera de alcance de esta
+/// épica): el historial completo de derivaciones de Comando necesita
+/// un endpoint nuevo — hoy `porEstado(CREADO)` solo trae lo pendiente
+/// de derivar; una vez derivado, el incidente desaparece de lo que
+/// Comando puede consultar. Esta épica NO intenta resolver eso — solo
+/// comunica la limitación con más claridad mientras se resuelve.
 class HomeComandoView extends StatefulWidget {
   const HomeComandoView({super.key});
 
@@ -256,29 +280,108 @@ class _HomeComandoViewState extends State<HomeComandoView>
               // por eso usamos incidentesPorEstado para mostrar el historial
               // dentro de los datos ya cargados — que incluye solo CREADO.
               // Para un historial real de Comando se necesitaría otro endpoint.
-              // Por ahora mostramos un aviso claro.)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.history_outlined,
-                          size: 56, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text(
-                        'El historial completo de incidentes derivados '
-                        'requiere un endpoint adicional en el backend.\n\n'
-                        'Usa "Detalle" desde la card antes de derivar para '
-                        'ver el estado de un incidente específico.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              // EPIC-12: ver [_avisoDelegadosPendiente] — mismo hueco de
+              // backend, presentación mejorada.)
+              _avisoDelegadosPendiente(),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// EPIC-12 — panel de "Delegados", honesto sobre por qué está vacío.
+  ///
+  /// REQUIERE CAMBIO DE BACKEND (hallazgo #14): esto NO es una lista
+  /// vacía en el sentido normal ("todavía no hay datos, pero la
+  /// función funciona") — es una función que directamente no se puede
+  /// construir todavía del lado del cliente, porque el backend no
+  /// expone el endpoint que la alimentaría. Por eso NO usa
+  /// [EmptyState] (ese widget comunica "sin datos", no "sin función")
+  /// y en cambio usa un panel con estilo `AppColors.info` — visualmente
+  /// distinto tanto de un estado vacío normal como de un error real.
+  ///
+  /// La sugerencia práctica ("mirá el detalle antes de derivar") es la
+  /// MISMA limitación de siempre, solo mejor explicada: `porEstado`
+  /// solo trae `CREADO`, así que en cuanto Comando deriva un incidente,
+  /// deja de poder consultarlo desde acá — no hay ningún atajo nuevo,
+  /// solo comunicación más clara de uno ya existente.
+  Widget _avisoDelegadosPendiente() {
+    // FIX: en pantallas de test/dispositivos con poca altura disponible
+    // (el TabBarView le da a este tab una altura FIJA, no scrolleable
+    // por sí sola), este panel —bastante más alto que el aviso plano
+    // que reemplaza— podía desbordar verticalmente ("RenderFlex
+    // overflowed... bottom"). `SingleChildScrollView` es la misma
+    // salvaguarda que ya usan los demás sheets/paneles de esta vista
+    // (`_BottomSheetDerivar`, el diálogo de invitación) — si el
+    // contenido entra, se ve idéntico (`Center` sigue centrándolo
+    // cuando sobra espacio); si no entra, scrollea en vez de desbordar.
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.xxl),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            decoration: BoxDecoration(
+              color: AppColors.info.withValues(alpha: 0.08),
+              borderRadius: AppRadius.borderLg,
+              border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: const BoxDecoration(
+                    color: AppColors.info,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.construction_outlined,
+                      color: Colors.white, size: 26),
+                ),
+                AppSpacing.gapMd,
+                Text(
+                  'Historial de derivaciones — pendiente de backend',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.tituloMediano,
+                ),
+                AppSpacing.gapSm,
+                Text(
+                  'Esta pestaña va a mostrar el historial completo de '
+                  'incidentes ya derivados. Todavía no está disponible: '
+                  'requiere un endpoint adicional en el backend que hoy '
+                  'no existe (hallazgo #14 de la auditoría UX/UI).',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.cuerpoPequeno
+                      .copyWith(color: Colors.grey.shade700),
+                ),
+                AppSpacing.gapMd,
+                Divider(color: AppColors.info.withValues(alpha: 0.25)),
+                AppSpacing.gapSm,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.lightbulb_outline,
+                        size: 16, color: AppColors.info),
+                    AppSpacing.gapSm,
+                    Expanded(
+                      child: Text(
+                        'Mientras tanto: abrí el detalle de un incidente, '
+                        'en "Reportados", ANTES de derivarlo — ahí vas a '
+                        'poder seguir su estado y su historial de '
+                        'auditoría aunque ya no aparezca en esta lista.',
+                        textAlign: TextAlign.start,
+                        style: AppTextStyles.etiqueta.copyWith(
+                          color: AppColors.info,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -293,7 +396,8 @@ class _BottomSheetDerivar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.xl, AppSpacing.xl, AppSpacing.xl, 32),
       child: SingleChildScrollView(
         child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -301,52 +405,50 @@ class _BottomSheetDerivar extends StatelessWidget {
         children: [
           Row(children: [
             const Icon(Icons.domain_add_outlined, size: 24),
-            const SizedBox(width: 10),
-            const Text('Derivar a CAI',
-                style:
-                    TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            AppSpacing.gapSm,
+            const Text('Derivar a CAI', style: AppTextStyles.tituloMediano),
             const Spacer(),
             IconButton(
                 icon: const Icon(Icons.close),
                 tooltip: 'Cerrar',
                 onPressed: () => Navigator.pop(context, false)),
           ]),
-          const SizedBox(height: 4),
-          const Text(
+          AppSpacing.gapXs,
+          Text(
             'El sistema derivará la emergencia al CAI más cercano '
             'usando la ubicación reportada (algoritmo Haversine).',
-            style: TextStyle(color: Colors.grey, fontSize: 13),
+            style: AppTextStyles.cuerpoPequeno
+                .copyWith(color: Colors.grey.shade600),
           ),
-          const SizedBox(height: 16),
+          AppSpacing.gapLg,
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue.shade300),
+              color: AppColors.info.withValues(alpha: 0.08),
+              borderRadius: AppRadius.borderSm,
+              border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
             ),
             child: Row(children: [
-              Icon(Icons.location_on, color: Colors.blue.shade700),
-              const SizedBox(width: 12),
+              const Icon(Icons.location_on, color: AppColors.info),
+              AppSpacing.gapMd,
               const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('CAI más cercano (automático)',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14)),
+                        style: AppTextStyles.cuerpo),
                     Text(
                       'El sistema calcula el CAI con menor distancia al '
                       'punto de la emergencia.',
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                      style: AppTextStyles.etiqueta,
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.check_circle, color: Colors.blue.shade600),
+              const Icon(Icons.check_circle, color: AppColors.info),
             ]),
           ),
-          const SizedBox(height: 20),
+          AppSpacing.gapXxl,
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -354,8 +456,7 @@ class _BottomSheetDerivar extends StatelessWidget {
                 backgroundColor: AppColors.negroTexto,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(borderRadius: AppRadius.borderMd),
               ),
               onPressed: () => Navigator.pop(context, true),
               child: const Text('Confirmar derivación',
