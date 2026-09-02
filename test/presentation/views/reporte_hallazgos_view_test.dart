@@ -82,7 +82,8 @@ void main() {
   });
 
   testWidgets(
-      'con descripción, envío exitoso llama crearHallazgos(incidenteId, descripcion) '
+      'con descripción, envío exitoso pide confirmación y luego llama '
+      'crearHallazgos(incidenteId, descripcion) '
       '— el agenteId ya NO se envía en el body (Épica 8: el backend lo saca del '
       'JWT) — NUNCA evaluar() (no existe IIncidenteService en este árbol) — navega '
       'a HomeAgenteView limpiando el stack y muestra el snackbar', (tester) async {
@@ -105,6 +106,17 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Enviar reporte'));
     await tester.pumpAndSettle();
 
+    // EPIC-10: el tap de arriba solo abre la confirmación — todavía no
+    // se llamó al backend.
+    expect(find.text('¿Enviar reporte y finalizar el incidente?'), findsOneWidget);
+    verifyNever(() => reporteService.crearHallazgos(
+          incidenteId: any(named: 'incidenteId'),
+          descripcion: any(named: 'descripcion'),
+        ));
+
+    await tester.tap(find.widgetWithText(TextButton, 'Sí, enviar'));
+    await tester.pumpAndSettle();
+
     verify(() => reporteService.crearHallazgos(
           incidenteId: 'i-001',
           descripcion: 'Todo en orden al llegar.',
@@ -114,6 +126,29 @@ void main() {
     // El formulario ya no está en el árbol — pushNamedAndRemoveUntil
     // eliminó el stack completo.
     expect(find.byType(ReporteHallazgosView), findsNothing);
+  });
+
+  testWidgets('cancelar la confirmación NO llama a crearHallazgos() y deja el formulario',
+      (tester) async {
+    await tester.pumpWidget(appDePrueba());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'Todo en orden al llegar.');
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Enviar reporte'));
+    await tester.pumpAndSettle();
+
+    // El diálogo también tiene un botón "Cancelar" — a diferencia del
+    // "Cancelar" del formulario (OutlinedButton), el del diálogo es un
+    // TextButton, así que este finder es inequívoco.
+    await tester.tap(find.widgetWithText(TextButton, 'Cancelar'));
+    await tester.pumpAndSettle();
+
+    verifyNever(() => reporteService.crearHallazgos(
+          incidenteId: any(named: 'incidenteId'),
+          descripcion: any(named: 'descripcion'),
+        ));
+    expect(find.byType(ReporteHallazgosView), findsOneWidget);
   });
 
   testWidgets('descripción solo con espacios en blanco mantiene el botón deshabilitado',
@@ -145,6 +180,8 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Descripción cualquiera.');
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ElevatedButton, 'Enviar reporte'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Sí, enviar'));
     await tester.pumpAndSettle();
 
     expect(find.text('El incidente ya no está en atención.'), findsOneWidget);

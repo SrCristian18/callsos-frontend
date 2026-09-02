@@ -15,6 +15,7 @@ import '../../data/services/api_exception.dart';
 import '../../data/services/incidente_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_snackbar.dart';
+import '../widgets/confirmation_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_view.dart';
 import '../widgets/estado_chip.dart';
@@ -45,6 +46,22 @@ import '../widgets/timeline.dart';
 /// - AGENTE + EN_ATENCION           → "Finalizar" → PATCH /{id}/evaluar + ReporteHallazgos.
 /// - Activo + no DENUNCIANTE        → "Cancelar" → PATCH /{id}/cancelar.
 /// - DENUNCIANTE + activo            → "Cancelar emergencia".
+///
+/// EPIC-10 (Design System, auditoría UX/UI) — "Experiencia del Agente":
+/// - La acción principal del AGENTE ("Ir en camino" / "Llegué — Iniciar
+///   atención" / "Finalizar y reportar hallazgos", una por estado, nunca
+///   más de una a la vez) se saca del contenido scrolleable y se fija en
+///   un `bottomNavigationBar` — ver [_accionPrincipalAgente] y
+///   [_barraAccionPrincipal]. Así queda SIEMPRE visible sin scroll
+///   (criterio de terminado de la épica) y, de paso, queda espacialmente
+///   separada de "Cancelar emergencia" (que sigue en la lista
+///   scrolleable) — dos botones grandes uno pegado al otro es
+///   exactamente el escenario de toque accidental que la heurística #5
+///   busca evitar.
+/// - "Cancelar emergencia" (cualquier rol) ahora pide confirmación
+///   ([ConfirmationDialog], mismo componente de EPIC-04) antes de
+///   ejecutar — es la acción más irreversible de toda esta vista y
+///   antes se disparaba con un solo toque, sin pedir confirmación.
 class DetalleIncidenteView extends StatefulWidget {
   const DetalleIncidenteView({super.key});
 
@@ -155,6 +172,9 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
 
   @override
   Widget build(BuildContext context) {
+    final rol = context.read<SesionViewModel>().rol;
+    final service = context.read<IIncidenteService>();
+
     return Scaffold(
       backgroundColor: AppColors.blancoVerde,
       appBar: AppBar(
@@ -194,11 +214,17 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
               )
             : null,
       ),
-      body: _buildBody(),
+      body: _buildBody(rol, service),
+      // EPIC-10: acción principal del AGENTE fijada fuera del área
+      // scrolleable — ver el comentario de clase. `null` en cualquier
+      // otro caso (Scaffold lo maneja bien: sin bottomNavigationBar).
+      bottomNavigationBar: _incidente != null
+          ? _barraAccionPrincipal(_incidente!, rol, service)
+          : null,
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(Rol? rol, IIncidenteService service) {
     // EPIC-09 (Design System, auditoría UX/UI) — checklist §18
     // (loading/success/error/empty), igual que `IncidenteListBody`: los
     // 3 estados sin datos pasan a usar los componentes de EPIC-03 en vez
@@ -236,8 +262,6 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
 
     final inc = _incidente!;
     final sesion = context.read<SesionViewModel>();
-    final rol = sesion.rol;
-    final service = context.read<IIncidenteService>();
     final pres = catalogoTipos[inc.tipo];
 
     // EPIC-07: tab "Detalle" (contenido ya existente, sin cambios) +
@@ -433,87 +457,146 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
       ));
     }
 
-    // AGENTE + AGENTE_ASIGNADO → en camino
+    // EPIC-10: "Modo prueba" (SOLO pruebas piloto) sigue viviendo en la
+    // lista scrolleable — es una preferencia auxiliar, no la acción
+    // principal, así que no tiene por qué competir por el espacio fijo
+    // del `bottomNavigationBar` (ver [_accionPrincipalAgente]). Se
+    // muestra en el mismo estado en el que antes vivía pegado a "Ir en
+    // camino" (AGENTE_ASIGNADO) para que sea visible ANTES de que el
+    // agente dispare esa acción desde la barra inferior.
     if (rol == Rol.AGENTE &&
-        inc.estado == EstadoIncidente.AGENTE_ASIGNADO) {
-      // FIX Épica 7: sin esta guarda, "Compartir mi ubicación" (arriba)
-      // y "Ir en camino" quedaban pegados sin espacio cuando ambos
-      // aplican a la vez (mismo estado AGENTE_ASIGNADO para AGENTE).
+        inc.estado == EstadoIncidente.AGENTE_ASIGNADO &&
+        AppConfig.modoPruebaHabilitado) {
       if (botones.isNotEmpty) botones.add(const SizedBox(height: 10));
-
-      // Modo prueba (SOLO pruebas piloto): el switch solo se agrega a la
-      // lista de widgets si este build tiene el flag encendido — en
-      // producción este bloque nunca se construye.
-      if (AppConfig.modoPruebaHabilitado) {
-        botones.add(_switchModoPrueba());
-        botones.add(const SizedBox(height: 6));
-      }
-
-      botones.add(_boton(
-        label: '🚓 Ir en camino',
-        color: Colors.blue.shade700,
-        onPressed: () => _ejecutar(
-          () => service.enCamino(
-            inc.id,
-            simular: AppConfig.modoPruebaHabilitado && _modoPrueba,
-          ),
-          mensajeExito: _modoPrueba && AppConfig.modoPruebaHabilitado
-              ? 'Marcaste que vas en camino (simulado).'
-              : 'Marcaste que vas en camino.',
-        ),
-      ));
+      botones.add(_switchModoPrueba());
     }
 
-    // AGENTE + AGENTE_EN_CAMINO → atender
-    if (rol == Rol.AGENTE &&
-        inc.estado == EstadoIncidente.AGENTE_EN_CAMINO) {
-      // FIX Épica 7: misma razón que arriba — "Compartir mi ubicación"
-      // también aplica en AGENTE_EN_CAMINO.
-      if (botones.isNotEmpty) botones.add(const SizedBox(height: 10));
-      botones.add(_boton(
-        label: '🏠 Llegué — Iniciar atención',
-        color: Colors.indigo,
-        onPressed: () => _ejecutar(
-          () => service.atender(inc.id),
-          mensajeExito: 'Atención iniciada.',
-        ),
-      ));
-    }
-
-    // AGENTE + EN_ATENCION → reporte de hallazgos (sin evaluar() previo)
-    if (rol == Rol.AGENTE &&
-        inc.estado == EstadoIncidente.EN_ATENCION) {
-      // FIX Épica 7: misma razón que arriba — "Compartir mi ubicación"
-      // también aplica en EN_ATENCION.
-      if (botones.isNotEmpty) botones.add(const SizedBox(height: 10));
-      botones.add(_boton(
-        label: '✅ Finalizar y reportar hallazgos',
-        color: Colors.green.shade700,
-        onPressed: () => Navigator.pushNamed(
-          context,
-          AppRoutes.reporteHallazgos,
-          arguments: {'incidenteId': inc.id},
-          // F.4: NO llamar evaluar() aquí — POST /reportes/hallazgos
-          // ya finaliza el incidente internamente (CrearReporteHallazgosService).
-        ),
-      ));
-    }
-
-    // Cancelar — cualquier estado activo
+    // Cancelar — cualquier estado activo.
+    //
+    // EPIC-10 (criterio "riesgo de toque accidental" / heurística #5):
+    // es la acción más irreversible de esta lista y antes se ejecutaba
+    // con un solo toque. Ahora pide confirmación explícita — mismo
+    // componente que ya usan el logout (EPIC-08) y, desde esta misma
+    // épica, "Enviar reporte" en `reporte_hallazgos_view.dart`.
     if (inc.estaActivo) {
       if (botones.isNotEmpty) botones.add(const SizedBox(height: 10));
       botones.add(_boton(
         label: 'Cancelar emergencia',
         color: Colors.red,
         outlined: true,
-        onPressed: () => _ejecutar(
-          () => service.cancelar(inc.id),
-          mensajeExito: 'Emergencia cancelada.',
-        ),
+        onPressed: () => _confirmarYCancelar(inc, service),
       ));
     }
 
     return botones;
+  }
+
+  Future<void> _confirmarYCancelar(
+      Incidente inc, IIncidenteService service) async {
+    final confirmado = await ConfirmationDialog.show(
+      context,
+      title: '¿Cancelar esta emergencia?',
+      message: 'El incidente va a quedar CANCELADO. Esta acción no se '
+          'puede deshacer.',
+      confirmText: 'Sí, cancelar',
+      isDangerous: true,
+    );
+    if (!confirmado || !mounted) return;
+
+    await _ejecutar(
+      () => service.cancelar(inc.id),
+      mensajeExito: 'Emergencia cancelada.',
+    );
+  }
+
+  /// EPIC-10 — la acción principal del AGENTE para el estado actual del
+  /// incidente (una sola a la vez, nunca simultánea con otra: los 3
+  /// estados son mutuamente excluyentes). `null` si el rol no es AGENTE
+  /// o si el estado actual no tiene una acción principal asociada (ej.
+  /// CREADO, DERIVADO_A_CAI, FINALIZADO, CANCELADO).
+  ///
+  /// Se renderiza en [_barraAccionPrincipal], FUERA del
+  /// `SingleChildScrollView` de [_buildDetalle] — ver el comentario de
+  /// clase.
+  Widget? _accionPrincipalAgente(
+      Incidente inc, Rol? rol, IIncidenteService service) {
+    if (rol != Rol.AGENTE) return null;
+
+    switch (inc.estado) {
+      case EstadoIncidente.AGENTE_ASIGNADO:
+        return _boton(
+          label: '🚓 Ir en camino',
+          color: Colors.blue.shade700,
+          cargando: _enProceso,
+          onPressed: () => _ejecutar(
+            () => service.enCamino(
+              inc.id,
+              simular: AppConfig.modoPruebaHabilitado && _modoPrueba,
+            ),
+            mensajeExito: _modoPrueba && AppConfig.modoPruebaHabilitado
+                ? 'Marcaste que vas en camino (simulado).'
+                : 'Marcaste que vas en camino.',
+          ),
+        );
+
+      case EstadoIncidente.AGENTE_EN_CAMINO:
+        return _boton(
+          label: '🏠 Llegué — Iniciar atención',
+          color: Colors.indigo,
+          cargando: _enProceso,
+          onPressed: () => _ejecutar(
+            () => service.atender(inc.id),
+            mensajeExito: 'Atención iniciada.',
+          ),
+        );
+
+      case EstadoIncidente.EN_ATENCION:
+        return _boton(
+          label: '✅ Finalizar y reportar hallazgos',
+          color: Colors.green.shade700,
+          cargando: _enProceso,
+          onPressed: () => Navigator.pushNamed(
+            context,
+            AppRoutes.reporteHallazgos,
+            arguments: {'incidenteId': inc.id},
+            // F.4: NO llamar evaluar() aquí — POST /reportes/hallazgos
+            // ya finaliza el incidente internamente (CrearReporteHallazgosService).
+          ),
+        );
+
+      default:
+        return null;
+    }
+  }
+
+  /// Barra inferior fija con la acción principal del AGENTE — `null`
+  /// (sin `bottomNavigationBar`) para cualquier otro rol o estado sin
+  /// acción principal, ver [_accionPrincipalAgente].
+  Widget? _barraAccionPrincipal(
+      Incidente inc, Rol? rol, IIncidenteService service) {
+    final accion = _accionPrincipalAgente(inc, rol, service);
+    if (accion == null) return null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl, AppSpacing.md, AppSpacing.xl, AppSpacing.md),
+          child: accion,
+        ),
+      ),
+    );
   }
 
   /// Épica 6: abre el selector de tipo y, si el denunciante elige uno,
@@ -573,9 +656,21 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
     required Color color,
     required VoidCallback onPressed,
     bool outlined = false,
+    // EPIC-10: usado por [_accionPrincipalAgente] — la barra inferior
+    // fija no tiene un LoadingView propio como el resto de la lista
+    // scrolleable (ver `_enProceso` en `_buildDetalle`), así que el
+    // propio botón necesita poder mostrar "esto está en curso" sin
+    // desaparecer ni moverse de lugar.
+    bool cargando = false,
   }) {
-    final shape = RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14));
+    final shape = RoundedRectangleBorder(borderRadius: AppRadius.borderMd);
+    final child = cargando
+        ? const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.4),
+          )
+        : Text(label, style: const TextStyle(fontWeight: FontWeight.bold));
 
     return SizedBox(
       width: double.infinity,
@@ -587,9 +682,8 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: shape,
               ),
-              onPressed: onPressed,
-              child: Text(label,
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: cargando ? null : onPressed,
+              child: child,
             )
           : ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -598,9 +692,8 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: shape,
               ),
-              onPressed: onPressed,
-              child: Text(label,
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: cargando ? null : onPressed,
+              child: child,
             ),
     );
   }
