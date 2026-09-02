@@ -6,7 +6,9 @@ import '../../core/colores_app.dart';
 import '../../data/models/enums/rol.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_password_field.dart';
+import '../widgets/auth_error_banner.dart';
 import '../widgets/custom_input.dart';
+import '../widgets/primary_loading_button.dart';
 
 /// Login de roles policiales (Agente, Operador CAI, Comando).
 ///
@@ -25,6 +27,11 @@ import '../widgets/custom_input.dart';
 /// La reescritura visual completa (rediseño, textos, validaciones de
 /// formulario) es alcance de F.1/F.2; este cambio se limita a conectar la
 /// funcionalidad de sesión.
+///
+/// EPIC-13 (Design System, auditoría UX/UI) — error y botón de carga
+/// migrados a [AuthErrorBanner]/[PrimaryLoadingButton] (ver
+/// docstrings), unificando el tratamiento visual con [LoginView],
+/// [RegisterDenuncianteView] y [RegisterPoliciaView].
 class LoginPoliciaView extends StatefulWidget {
   const LoginPoliciaView({super.key});
 
@@ -128,31 +135,17 @@ class _LoginPoliciaViewState extends State<LoginPoliciaView> {
 
                   if (sesion.errorMessage != null) ...[
                     const SizedBox(height: 8),
-                    Text(
-                      sesion.errorMessage!,
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
+                    AuthErrorBanner(mensaje: sesion.errorMessage!),
                   ],
 
                   const SizedBox(height: 10),
 
-                  sesion.isLoading
-                      ? const CircularProgressIndicator()
-                      : ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.negroTexto,
-                            minimumSize: const Size(double.infinity, 50),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(25),
-                            ),
-                          ),
-                          onPressed: () => _onLoginPressed(sesion),
-                          child: const Text(
-                            "Iniciar sesión",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
+                  PrimaryLoadingButton(
+                    label: 'Iniciar sesión',
+                    isLoading: sesion.isLoading,
+                    backgroundColor: AppColors.negroTexto,
+                    onPressed: () => _onLoginPressed(sesion),
+                  ),
                   const SizedBox(height: 14),
 
                   // Recuperar contraseña
