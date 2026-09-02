@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../core/app_config.dart';
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
-import '../../data/models/enums/rol.dart';
 import '../../data/services/notificacion_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_password_field.dart';
@@ -55,11 +54,16 @@ class _LoginViewState extends State<LoginView> {
     );
 
     if (exito && mounted) {
-      // F.5 — Registrar token FCM solo si Firebase está habilitado y el
-      // rol es DENUNCIANTE (el backend solo usa tokenFcm para denunciantes).
-      if (AppConfig.firebaseHabilitado && sesion.rol == Rol.DENUNCIANTE) {
+      // F.5 — Registrar token FCM solo si Firebase está habilitado.
+      // Épica 8 (hallazgo #5): antes solo se llamaba para DENUNCIANTE
+      // ("el backend solo usa tokenFcm para denunciantes" — desactualizado
+      // desde Épica 5). Ahora se llama siempre que haya rol; el propio
+      // NotificacionService despacha al servicio correcto según el rol
+      // (o lo ignora silenciosamente si es COMANDO).
+      if (AppConfig.firebaseHabilitado && sesion.rol != null) {
         context.read<NotificacionService>().registrarTokenEnBackend(
               actorId: sesion.actorId!,
+              rol: sesion.rol!,
             );
       }
       Navigator.pushReplacementNamed(context, AppRoutes.homeDenunciante);

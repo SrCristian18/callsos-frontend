@@ -1,6 +1,7 @@
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
+import 'package:CallSos/data/services/agente_service.dart';
 import 'package:CallSos/data/services/api_client.dart';
 import 'package:CallSos/data/services/auditoria_service.dart';
 import 'package:CallSos/data/services/auth_service.dart';
@@ -67,19 +68,34 @@ class AppProviders {
       Provider<ICaiService>(
         create: (_) => CaiService(apiClient),
       ),
+      // Épica 8 (hallazgo #5): antes no existía ningún servicio dedicado
+      // al recurso Agente — ver docstring de `agente_service.dart`.
+      Provider<IAgenteService>(
+        create: (_) => AgenteService(apiClient),
+      ),
       // ── EPIC-07 — Auditorías e historiales (Timeline) ────────────────
       Provider<IAuditoriaService>(
         create: (_) => AuditoriaService(apiClient),
       ),
 
       // ── F.5 — Notificaciones push ───────────────────────────────────
-      ProxyProvider<IDenuncianteService, NotificacionService>(
+      // Épica 8 (hallazgo #5): antes dependía solo de IDenuncianteService
+      // — ahora despacha según el rol del actor (DENUNCIANTE/AGENTE/
+      // OPERADOR_CAI), ver `NotificacionService.registrarTokenEnBackend`.
+      ProxyProvider3<IDenuncianteService, IAgenteService, ICaiService,
+          NotificacionService>(
         create: (context) => NotificacionService(
           denuncianteService: context.read<IDenuncianteService>(),
+          agenteService: context.read<IAgenteService>(),
+          caiService: context.read<ICaiService>(),
         ),
-        update: (_, denuncianteService, previous) =>
+        update: (_, denuncianteService, agenteService, caiService, previous) =>
             previous ??
-            NotificacionService(denuncianteService: denuncianteService),
+            NotificacionService(
+              denuncianteService: denuncianteService,
+              agenteService: agenteService,
+              caiService: caiService,
+            ),
       ),
 
       // ── F.0.4 — Sesión (DEBE ir antes de cualquier ProxyProvider

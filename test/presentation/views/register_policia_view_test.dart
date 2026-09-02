@@ -25,6 +25,13 @@ import 'package:CallSos/presentation/views/register_policia_view.dart';
 /// navegando a homeAgente.
 class MockAuthService extends Mock implements IAuthService {}
 
+/// Nota (Épica 8, hallazgo #5): mismo comentario que
+/// `login_policia_view_test.dart` — esta vista ahora también llama
+/// `NotificacionService.registrarTokenEnBackend()` tras un registro
+/// exitoso, pero esa rama está detrás de `AppConfig.firebaseHabilitado`
+/// (constante de compilación, `false` por defecto en tests), así que no
+/// se ejecuta acá. Cobertura real del despacho en
+/// `notificacion_service_test.dart`.
 class FakeSecureStorage implements ISecureStorage {
   final Map<String, String> _datos = {};
   @override

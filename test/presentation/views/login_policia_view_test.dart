@@ -14,6 +14,17 @@ import 'package:CallSos/presentation/views/login_policia_view.dart';
 
 class MockAuthService extends Mock implements IAuthService {}
 
+/// Nota (Épica 8, hallazgo #5): esta vista ahora también llama
+/// `NotificacionService.registrarTokenEnBackend()` tras un login
+/// exitoso (ver `login_policia_view.dart`), pero esa rama está detrás de
+/// `AppConfig.firebaseHabilitado` — una constante de COMPILACIÓN
+/// (`bool.fromEnvironment`, default `false`) que no puede alternarse en
+/// tiempo de ejecución dentro de un mismo `flutter test`. Con el valor
+/// por defecto (`false`, el que usan estos tests), esa rama nunca se
+/// ejecuta, así que no hace falta proveer `NotificacionService` acá — el
+/// despacho correcto por rol (AGENTE → `IAgenteService`, OPERADOR_CAI →
+/// `ICaiService`, COMANDO omitido) ya está cubierto exhaustivamente en
+/// `notificacion_service_test.dart`.
 class FakeSecureStorage implements ISecureStorage {
   final Map<String, String> _datos = {};
   @override
