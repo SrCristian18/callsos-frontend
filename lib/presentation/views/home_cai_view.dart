@@ -24,6 +24,21 @@ import '../widgets/incidente_list_body.dart';
 /// Tabs: "Por Asignar" (DERIVADO_A_CAI) / "Historial" (resto).
 /// Acción "Asignar Agente": bottom sheet con opción automática
 /// (ver F.0.7 gap 3) → PATCH /{id}/asignar.
+///
+/// EPIC-11 (Design System, auditoría UX/UI) — "Experiencia del Operador
+/// CAI": objetivo "priorizar información operacional — qué está por
+/// asignar vs. qué ya se movió". Antes ambos tabs eran texto plano
+/// idéntico entre sí; ahora "Por Asignar" lleva un ícono de alerta +
+/// badge numérico en vivo con el conteo de pendientes (ver
+/// [_tabConBadge]/[_BadgeContador]) — el operador ve de un vistazo,
+/// SIN entrar al tab, si hay algo esperando su atención. "Historial" no
+/// lleva badge a propósito: nada ahí requiere ya una acción suya.
+///
+/// El acceso a auditoría desde el detalle (otro criterio de esta
+/// épica) ya estaba resuelto de forma genérica por EPIC-07 — la pestaña
+/// "Historial" de `DetalleIncidenteView` es igual de accesible para
+/// OPERADOR_CAI que para cualquier otro rol, sin nada específico que
+/// agregar acá.
 class HomeCAIView extends StatefulWidget {
   const HomeCAIView({super.key});
 
@@ -100,69 +115,177 @@ class _HomeCAIViewState extends State<HomeCAIView>
 
     return ChangeNotifierProvider.value(
       value: _vm,
-      child: Scaffold(
-        backgroundColor: AppColors.blancoVerde,
-        appBar: RoleHeader(
-          rol: Rol.OPERADOR_CAI,
-          titulo: 'Panel CAI',
-          subtitulo: sesion.nombreMostrar,
-          bottom: TabBar(
-            controller: _tabs,
-            indicatorColor: Colors.white,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white60,
-            tabs: const [
-              Tab(text: 'Por Asignar'),
-              Tab(text: 'Historial'),
-            ],
-          ),
-        ),
-        body: Consumer<IncidenteListViewModel>(
-          builder: (ctx, vm, _) => TabBarView(
-            controller: _tabs,
-            children: [
-              // Tab 1 — Por asignar (DERIVADO_A_CAI)
-              IncidenteListBody(
-                vm: vm,
-                incidentes: vm.incidentesPorEstado(
-                    [EstadoIncidente.DERIVADO_A_CAI]),
-                mensajeVacio: 'No hay incidentes pendientes de asignar.',
-                iconoVacio: Icons.assignment_outlined,
-                buildCard: (i) => IncidenteCard(
-                  incidente: i,
-                  onTap: () => Navigator.pushNamed(ctx,
-                      AppRoutes.detalleIncidente,
-                      arguments: {'incidenteId': i.id}),
-                  labelAccion: vm.enProceso(i.id)
-                      ? 'Asignando...'
-                      : 'Asignar Agente',
-                  onAccion: vm.enProceso(i.id)
-                      ? null
-                      : () => _mostrarAsignacionAgente(ctx, i),
-                ),
-              ),
+      // EPIC-11 — "Por Asignar" necesita el CONTEO de pendientes ya en
+      // el TabBar (dentro del AppBar), no solo dentro del body. Un
+      // `Consumer<IncidenteListViewModel>` alrededor del `body` (como
+      // antes) no alcanza para eso: el AppBar se arma en el MISMO
+      // `build()`, afuera de ese Consumer. `ListenableBuilder` envuelve
+      // el Scaffold entero para que AMBOS (TabBar con badge + body)
+      // se reconstruyan juntos cuando `_vm` notifica — mismo
+      // ChangeNotifier de siempre, solo se mueve el punto de escucha.
+      child: ListenableBuilder(
+        listenable: _vm,
+        builder: (ctx, _) {
+          // Objetivo de la épica: "priorizar información operacional —
+          // qué está por asignar vs. qué ya se movió". El conteo en
+          // vivo en la pestaña es la señal más directa de "esto
+          // necesita tu atención AHORA" (heurística #1 — visibilidad
+          // del estado del sistema) sin tener que entrar al tab para
+          // enterarse de cuántos hay.
+          final pendientes =
+              _vm.incidentesPorEstado([EstadoIncidente.DERIVADO_A_CAI]).length;
 
-              // Tab 2 — Historial (todos los demás estados)
-              IncidenteListBody(
-                vm: vm,
-                incidentes: vm.incidentesPorEstado([
-                  EstadoIncidente.AGENTE_ASIGNADO,
-                  EstadoIncidente.AGENTE_EN_CAMINO,
-                  EstadoIncidente.EN_ATENCION,
-                  EstadoIncidente.FINALIZADO,
-                  EstadoIncidente.CANCELADO,
-                ]),
-                mensajeVacio: 'El historial está vacío.',
-                iconoVacio: Icons.history_outlined,
-                buildCard: (i) => IncidenteCard(
-                  incidente: i,
-                  onTap: () => Navigator.pushNamed(ctx,
-                      AppRoutes.detalleIncidente,
-                      arguments: {'incidenteId': i.id}),
-                ),
+          return Scaffold(
+            backgroundColor: AppColors.blancoVerde,
+            appBar: RoleHeader(
+              rol: Rol.OPERADOR_CAI,
+              titulo: 'Panel CAI',
+              subtitulo: sesion.nombreMostrar,
+              bottom: TabBar(
+                controller: _tabs,
+                indicatorColor: Colors.white,
+                indicatorWeight: 3,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white60,
+                // EPIC-11 — distinción visual clara entre tabs: íconos
+                // distintos (reloj/alerta de "pendiente" vs. reloj de
+                // "historial") + badge numérico en "Por Asignar" — lo
+                // que ya se movió (Historial) no necesita contador,
+                // ya no requiere ninguna acción del operador.
+                tabs: [
+                  _tabConBadge(
+                    icono: Icons.assignment_late_outlined,
+                    etiqueta: 'Por Asignar',
+                    contador: pendientes,
+                  ),
+                  _tabConBadge(
+                    icono: Icons.history_outlined,
+                    etiqueta: 'Historial',
+                  ),
+                ],
               ),
+            ),
+            body: TabBarView(
+              controller: _tabs,
+              children: [
+                // Tab 1 — Por asignar (DERIVADO_A_CAI)
+                IncidenteListBody(
+                  vm: _vm,
+                  incidentes: _vm
+                      .incidentesPorEstado([EstadoIncidente.DERIVADO_A_CAI]),
+                  mensajeVacio: 'No hay incidentes pendientes de asignar.',
+                  iconoVacio: Icons.assignment_outlined,
+                  buildCard: (i) => IncidenteCard(
+                    incidente: i,
+                    onTap: () => Navigator.pushNamed(ctx,
+                        AppRoutes.detalleIncidente,
+                        arguments: {'incidenteId': i.id}),
+                    labelAccion: _vm.enProceso(i.id)
+                        ? 'Asignando...'
+                        : 'Asignar Agente',
+                    onAccion: _vm.enProceso(i.id)
+                        ? null
+                        : () => _mostrarAsignacionAgente(ctx, i),
+                  ),
+                ),
+
+                // Tab 2 — Historial (todos los demás estados)
+                IncidenteListBody(
+                  vm: _vm,
+                  incidentes: _vm.incidentesPorEstado([
+                    EstadoIncidente.AGENTE_ASIGNADO,
+                    EstadoIncidente.AGENTE_EN_CAMINO,
+                    EstadoIncidente.EN_ATENCION,
+                    EstadoIncidente.FINALIZADO,
+                    EstadoIncidente.CANCELADO,
+                  ]),
+                  mensajeVacio: 'El historial está vacío.',
+                  iconoVacio: Icons.history_outlined,
+                  buildCard: (i) => IncidenteCard(
+                    incidente: i,
+                    onTap: () => Navigator.pushNamed(ctx,
+                        AppRoutes.detalleIncidente,
+                        arguments: {'incidenteId': i.id}),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Tab con ícono + etiqueta y, opcionalmente, un badge numérico —
+  /// EPIC-11: reemplaza los `Tab(text: ...)` planos de antes, que se
+  /// veían idénticos entre sí sin importar cuántos incidentes tuviera
+  /// cada uno esperando.
+  ///
+  /// `Tab(child: ...)` (en vez de `text:`/`icon:` por separado) es el
+  /// patrón soportado por Flutter para contenido de tab custom — así
+  /// ambas pestañas comparten el mismo layout (ícono + texto en una
+  /// sola línea), en vez de que una tenga el layout de dos líneas
+  /// default (`icon` arriba, `text` abajo) y la otra no.
+  ///
+  /// FIX: en pantallas angostas (375px — Bloque 4, Épica 8), 2 tabs de
+  /// ancho igual dejan ~180px por tab; ícono + "Por Asignar" + badge no
+  /// entraban ahí y producían un `RenderFlex overflowed` real (lo
+  /// disparaba CUALQUIER test que corriera a ese tamaño, no solo los
+  /// que prueban el TabBar — un `RenderFlex overflowed` durante el
+  /// build inicial cuenta como excepción no capturada para toda la
+  /// pantalla). `FittedBox(fit: BoxFit.scaleDown)` es la salvaguarda:
+  /// si el contenido entra, se ve igual que antes; si no entra, se
+  /// achica hasta entrar — nunca desborda, sin importar cuán angosta
+  /// sea la pantalla.
+  Widget _tabConBadge({
+    required IconData icono,
+    required String etiqueta,
+    int? contador,
+  }) {
+    return Tab(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icono, size: 18),
+            const SizedBox(width: 6),
+            Text(etiqueta),
+            if (contador != null && contador > 0) ...[
+              const SizedBox(width: 6),
+              _BadgeContador(contador),
             ],
-          ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Badge numérico — EPIC-11. Color `AppColors.warning` (naranja,
+/// EPIC-01): estos son incidentes que YA necesitan una acción del
+/// operador ("por asignar"), a diferencia del contenido de "Historial"
+/// (ya resuelto/en curso en otro estado), que no lleva badge.
+class _BadgeContador extends StatelessWidget {
+  final int contador;
+  const _BadgeContador(this.contador);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      constraints: const BoxConstraints(minWidth: 20),
+      decoration: BoxDecoration(
+        color: AppColors.warning,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        '$contador',
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );

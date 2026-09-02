@@ -59,7 +59,6 @@ class EtaViewModel extends ChangeNotifier {
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
-  String? _incidenteId;
 
   /// Inicia la carga inicial por REST y la suscripción en tiempo real.
   ///
@@ -68,7 +67,6 @@ class EtaViewModel extends ChangeNotifier {
   /// widget solo debe mostrar "calculando..." hasta que llegue lo
   /// primero que llegue.
   Future<void> iniciar(String incidenteId) async {
-    _incidenteId = incidenteId;
 
     // 1 — valor inicial por REST (no espera al primer mensaje STOMP).
     try {

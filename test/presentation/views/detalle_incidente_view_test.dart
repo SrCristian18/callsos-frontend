@@ -317,8 +317,9 @@ void main() {
     verifyNever(() => incidenteService.evaluar(any()));
   });
 
-  testWidgets('DENUNCIANTE + incidente activo: muestra y usa "Cancelar emergencia"',
-      (tester) async {
+  testWidgets(
+      'DENUNCIANTE + incidente activo: "Cancelar emergencia" pide confirmación '
+      '(EPIC-10) y solo cancela si se confirma', (tester) async {
     await loguearComo('den-001', Rol.DENUNCIANTE);
     when(() => incidenteService.consultar('i-001'))
         .thenAnswer((_) async => _fake('i-001', EstadoIncidente.CREADO));
@@ -330,8 +331,37 @@ void main() {
     await tester.tap(find.text('Cancelar emergencia'));
     await tester.pumpAndSettle();
 
+    // El tap de arriba solo abre la confirmación — todavía no se llamó
+    // al backend.
+    expect(find.text('¿Cancelar esta emergencia?'), findsOneWidget);
+    verifyNever(() => incidenteService.cancelar(any()));
+
+    await tester.tap(find.widgetWithText(TextButton, 'Sí, cancelar'));
+    await tester.pumpAndSettle();
+
     verify(() => incidenteService.cancelar('i-001')).called(1);
     expect(find.text('Emergencia cancelada.'), findsOneWidget);
+  });
+
+  testWidgets('DENUNCIANTE + incidente activo: cancelar la confirmación NO '
+      'llama a cancelar()', (tester) async {
+    await loguearComo('den-001', Rol.DENUNCIANTE);
+    when(() => incidenteService.consultar('i-001'))
+        .thenAnswer((_) async => _fake('i-001', EstadoIncidente.CREADO));
+
+    await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Cancelar emergencia'));
+    await tester.pumpAndSettle();
+    // El diálogo también tiene un "Cancelar" (TextButton) — distinto del
+    // "Cancelar emergencia" (OutlinedButton) que sigue detrás del
+    // overlay, así que este finder es inequívoco.
+    await tester.tap(find.widgetWithText(TextButton, 'Cancelar'));
+    await tester.pumpAndSettle();
+
+    verifyNever(() => incidenteService.cancelar(any()));
+    expect(find.byType(DetalleIncidenteView), findsOneWidget);
   });
 
   // Épica 6 — actualizar tipo de incidente (denunciante dueño).
@@ -670,6 +700,102 @@ void main() {
         await tester.pumpWidget(const SizedBox());
         await sesion.logout();
       }
+    });
+  });
+
+  // EPIC-10 — criterio de terminado: "acción principal siempre visible
+  // sin scroll en pantallas de tamaño estándar".
+  group('EPIC-10 — acción principal del AGENTE fija (sin scroll)', () {
+    testWidgets(
+        'AGENTE + AGENTE_ASIGNADO: "Ir en camino" vive en el '
+        'bottomNavigationBar, no en la lista scrolleable', (tester) async {
+      await loguearComo('ag-001', Rol.AGENTE);
+      when(() => incidenteService.consultar('i-001'))
+          .thenAnswer((_) async => _fake('i-001', EstadoIncidente.AGENTE_ASIGNADO));
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+      expect(scaffold.bottomNavigationBar, isNotNull);
+      expect(
+        find.descendant(
+          of: find.byWidget(scaffold.bottomNavigationBar!),
+          matching: find.textContaining('Ir en camino'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'con pantalla de tamaño estándar (390x844) y una descripción larga, '
+        'el botón principal queda dentro del viewport sin necesidad de scroll',
+        (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await loguearComo('ag-001', Rol.AGENTE);
+      final descripcionLarga = 'Se reporta una situación de robo en la vía '
+          'pública, presuntamente con arma blanca, el sujeto huyó en '
+          'dirección al norte por la carrera principal, se solicita '
+          'atención urgente ya que hay varios testigos presentes en el '
+          'lugar de los hechos y se requiere refuerzo policial inmediato.';
+      when(() => incidenteService.consultar('i-001')).thenAnswer(
+        (_) async => Incidente(
+          id: 'i-001',
+          fechaHora: DateTime(2026, 6, 14, 10, 30),
+          tipo: TipoIncidenteEnum.ROBOS_O_ASALTOS,
+          descripcion: descripcionLarga,
+          estado: EstadoIncidente.AGENTE_ASIGNADO,
+          latitud: 10.391,
+          longitud: -75.4794,
+          denuncianteId: 'den-001',
+          nombreCAI: 'CAI San José',
+        ),
+      );
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      final boton = find.textContaining('Ir en camino');
+      expect(boton, findsOneWidget);
+
+      final posicionBoton = tester.getRect(boton);
+      final alturaPantalla =
+          tester.view.physicalSize.height / tester.view.devicePixelRatio;
+
+      expect(posicionBoton.bottom, lessThanOrEqualTo(alturaPantalla));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'rol sin acción principal (ej. COMANDO): sin bottomNavigationBar',
+        (tester) async {
+      await loguearComo('com-001', Rol.COMANDO);
+      when(() => incidenteService.consultar('i-001'))
+          .thenAnswer((_) async => _fake('i-001', EstadoIncidente.EN_ATENCION));
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+      expect(scaffold.bottomNavigationBar, isNull);
+    });
+
+    testWidgets(
+        'AGENTE en estado sin acción principal (ej. DERIVADO_A_CAI): '
+        'sin bottomNavigationBar', (tester) async {
+      await loguearComo('ag-001', Rol.AGENTE);
+      when(() => incidenteService.consultar('i-001'))
+          .thenAnswer((_) async => _fake('i-001', EstadoIncidente.DERIVADO_A_CAI));
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+      expect(scaffold.bottomNavigationBar, isNull);
     });
   });
 

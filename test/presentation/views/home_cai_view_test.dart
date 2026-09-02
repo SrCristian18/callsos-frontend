@@ -122,6 +122,98 @@ void main() {
     expect(find.text('Asignar Agente'), findsNothing);
   });
 
+  // EPIC-11 — distinción visual clara entre tabs ("Por Asignar" lleva un
+  // badge en vivo con el conteo de pendientes; "Historial" no).
+  group('badge de pendientes en la pestaña "Por Asignar" (EPIC-11)', () {
+    testWidgets('sin incidentes DERIVADO_A_CAI, la pestaña no muestra badge',
+        (tester) async {
+      when(() => incidenteService.porCai())
+          .thenAnswer((_) async => [_fake('i-001', EstadoIncidente.FINALIZADO)]);
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+
+      expect(find.text('0'), findsNothing);
+      expect(find.text('Por Asignar'), findsOneWidget);
+    });
+
+    testWidgets('con 2 incidentes DERIVADO_A_CAI, la pestaña muestra el badge "2"',
+        (tester) async {
+      when(() => incidenteService.porCai()).thenAnswer((_) async => [
+            _fake('i-001', EstadoIncidente.DERIVADO_A_CAI),
+            _fake('i-002', EstadoIncidente.DERIVADO_A_CAI),
+            _fake('i-003', EstadoIncidente.FINALIZADO), // no cuenta
+          ]);
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+
+      expect(find.text('2'), findsOneWidget);
+    });
+
+    testWidgets(
+        'el badge se actualiza tras asignar un agente (el pendiente pasa a Historial)',
+        (tester) async {
+      when(() => incidenteService.porCai()).thenAnswer((_) async => [
+            _fake('i-001', EstadoIncidente.DERIVADO_A_CAI),
+          ]);
+      when(() => caiService.agentesDisponibles('cai-001')).thenAnswer((_) async => [
+            const AgenteDisponible(
+                id: 'ag-001', nombre: 'Carlos Agente', estado: EstadoAgente.DISPONIBLE),
+          ]);
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+      expect(find.text('1'), findsOneWidget);
+
+      // Tras confirmar, el refetch de porCai() ya no trae ese incidente
+      // en DERIVADO_A_CAI (pasó a AGENTE_ASIGNADO) — el badge debe
+      // desaparecer sin que el operador tenga que refrescar a mano.
+      when(() => incidenteService.porCai()).thenAnswer((_) async => [
+            _fake('i-001', EstadoIncidente.AGENTE_ASIGNADO),
+          ]);
+      when(() => incidenteService.asignar('i-001')).thenAnswer((_) async {});
+
+      await tester.tap(find.text('Asignar Agente'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar asignación'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('1'), findsNothing);
+    });
+
+    // FIX: regresión del bug real reportado tras el primer intento de
+    // esta épica — a 375px de ancho, 2 tabs de ancho igual dejan
+    // ~180px cada uno; ícono + "Por Asignar" + badge NO entraban ahí
+    // sin el `FittedBox(fit: BoxFit.scaleDown)` de `_tabConBadge`, y el
+    // `RenderFlex overflowed` resultante hacía fallar CUALQUIER test
+    // que corriera a este tamaño (no hacía falta ni tocar el TabBar a
+    // propósito) — incluyendo el test, ya existente y sin relación,
+    // del sheet de asignación en pantalla chica. Este test fija
+    // explícitamente el escenario que lo disparó: pantalla angosta +
+    // badge con 2 dígitos (el caso más ancho posible del badge).
+    testWidgets(
+        'el TabBar con badge no desborda en pantalla angosta (375x667), '
+        'incluso con 2 dígitos', (tester) async {
+      tester.view.physicalSize = const Size(375, 667);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      when(() => incidenteService.porCai()).thenAnswer((_) async => List.generate(
+            12,
+            (i) => _fake('i-${i.toString().padLeft(3, '0')}',
+                EstadoIncidente.DERIVADO_A_CAI),
+          ));
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+
+      expect(find.text('12'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   testWidgets(
       'tocar "Asignar Agente" abre el sheet y consulta agentesDisponibles(caiId) '
       'con el actorId de la sesión', (tester) async {

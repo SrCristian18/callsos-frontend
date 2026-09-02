@@ -6,6 +6,7 @@ import '../../core/colores_app.dart';
 import '../../data/services/reporte_service.dart';
 import '../viewmodels/reporte_hallazgos_viewmodel.dart';
 import '../widgets/app_snackbar.dart';
+import '../widgets/confirmation_dialog.dart';
 
 /// Formulario de reporte de hallazgos — completado por el agente al
 /// finalizar la atención.
@@ -24,6 +25,10 @@ import '../widgets/app_snackbar.dart';
 /// — el backend lo hace dentro de `CrearReporteHallazgosService`.
 ///
 /// Tras el éxito navega a [HomeAgenteView] con snackbar de confirmación.
+///
+/// EPIC-10: el botón "Enviar reporte" pide confirmación explícita
+/// ([ConfirmationDialog]) antes de disparar el POST — ver
+/// [_confirmarYEnviar].
 class ReporteHallazgosView extends StatefulWidget {
   const ReporteHallazgosView({super.key});
 
@@ -57,6 +62,27 @@ class _ReporteHallazgosViewState extends State<ReporteHallazgosView> {
     _descripcionController.dispose();
     _vm.dispose();
     super.dispose();
+  }
+
+  /// EPIC-10 (Design System, auditoría UX/UI) — criterio de terminado:
+  /// "confirmación en el cierre de incidente". Enviar este formulario
+  /// es irreversible (el incidente pasa a FINALIZADO — ver el
+  /// comentario de clase — y el reporte ya no se puede editar
+  /// después), así que antes de disparar el POST se pide una
+  /// confirmación explícita con [ConfirmationDialog] (mismo componente
+  /// de EPIC-04 que ya usan el logout y "Cancelar emergencia" — una
+  /// sola fuente de verdad para "¿esto es lo que querías tocar?" en
+  /// toda la app).
+  Future<void> _confirmarYEnviar() async {
+    final confirmado = await ConfirmationDialog.show(
+      context,
+      title: '¿Enviar reporte y finalizar el incidente?',
+      message: 'El incidente va a quedar FINALIZADO y este reporte ya no '
+          'se va a poder editar. Revisá la descripción antes de continuar.',
+      confirmText: 'Sí, enviar',
+      isDangerous: true,
+    );
+    if (confirmado && mounted) await _enviar();
   }
 
   Future<void> _enviar() async {
@@ -280,7 +306,7 @@ class _ReporteHallazgosViewState extends State<ReporteHallazgosView> {
                       ),
                       onPressed:
                           (vm.formularioValido && !vm.isLoading)
-                              ? _enviar
+                              ? _confirmarYEnviar
                               : null,
                       child: vm.isLoading
                           ? const SizedBox(

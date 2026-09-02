@@ -37,11 +37,11 @@ void main() {
     );
   }
 
-  Container _cajaIcono(WidgetTester tester) {
+  Container cajaIcono(WidgetTester tester) {
     return tester.widget<Container>(find.byKey(const ValueKey('eta_icono_box')));
   }
 
-  Color _colorDe(Container c) => (c.decoration as BoxDecoration).color!;
+  Color colorDe(Container c) => (c.decoration as BoxDecoration).color!;
 
   setUp(() {
     incidenteService = MockIncidenteService();
@@ -73,7 +73,7 @@ void main() {
       // acá haría que cualquier `pumpAndSettle()` con la conexión sin
       // resolver (como en `detalle_incidente_view_test.dart`) cuelgue.
       expect(find.byType(CircularProgressIndicator), findsNothing);
-      expect(_colorDe(_cajaIcono(tester)), AppColors.verdeOscuro);
+      expect(colorDe(cajaIcono(tester)), AppColors.verdeOscuro);
     });
   });
 
@@ -92,7 +92,7 @@ void main() {
       expect(find.textContaining('~8 min'), findsOneWidget);
       expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
-      expect(_colorDe(_cajaIcono(tester)), AppColors.verdeOscuro);
+      expect(colorDe(cajaIcono(tester)), AppColors.verdeOscuro);
     });
   });
 
@@ -119,7 +119,7 @@ void main() {
       );
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
-      expect(_colorDe(_cajaIcono(tester)), AppColors.error);
+      expect(colorDe(cajaIcono(tester)), AppColors.error);
     });
   });
 
