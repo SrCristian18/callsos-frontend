@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_radius.dart';
+import '../../core/app_spacing.dart';
+import '../../core/app_text_styles.dart';
 import '../../core/colores_app.dart';
 import '../../data/services/incidente_service.dart';
 import '../../data/services/stomp_service.dart';
@@ -40,6 +43,19 @@ import '../viewmodels/eta_viewmodel.dart';
 /// Se muestra solo cuando el incidente está en `AGENTE_EN_CAMINO` (ver
 /// `_botonesContextuales` en `DetalleIncidenteView`) — antes de eso no
 /// hay agente en camino cuyo ETA calcular.
+///
+/// EPIC-09 (Design System, auditoría UX/UI) — "estados de ETA más
+/// claros": antes de esta épica los 3 estados posibles (calculando /
+/// con datos / error) se diferenciaban SOLO por el texto del
+/// subtítulo — el ícono y el color de acento eran siempre los mismos
+/// (verde + reloj), así que un error se veía visualmente idéntico a un
+/// éxito, y había que leer el texto para notar la diferencia. Ahora
+/// cada estado tiene su propio ícono y su propio color de acento
+/// ([_EtaEstadoVisual]) — sin tocar [EtaViewModel] ni
+/// [EtaConexionEstado]: es pura lectura del estado que el ViewModel ya
+/// exponía, no un estado nuevo. (Se evaluó también animar el ícono de
+/// "calculando" con un spinner real; ver el comentario de
+/// [_EtaEstadoVisual] sobre por qué se descartó.)
 class EtaWidget extends StatefulWidget {
   final String incidenteId;
 
@@ -47,6 +63,42 @@ class EtaWidget extends StatefulWidget {
 
   @override
   State<EtaWidget> createState() => _EtaWidgetState();
+}
+
+/// Presentación visual (ícono + color) para cada estado de
+/// [EtaViewModel] — separado del widget para poder testearlo con un
+/// simple `switch` de entrada/salida, sin montar un `Consumer` completo.
+///
+/// IMPORTANTE: el ícono de "calculando" es estático (`Icons.sync`), NO
+/// un `CircularProgressIndicator`. Se probó primero con un spinner de
+/// verdad, pero `EtaConexionEstado.conectando` puede quedarse así
+/// indefinidamente (mientras el WS sigue intentando conectar — es un
+/// estado legítimamente indefinido, no efímero) y un
+/// `CircularProgressIndicator` corriendo sin parar hace que
+/// `tester.pumpAndSettle()` nunca termine en CUALQUIER test que monte
+/// este widget sin resolver la conexión explícitamente — incluido
+/// `detalle_incidente_view_test.dart`, que a propósito no lo hace (ver
+/// su comentario: "el test de ETA no depende de llegar a estado
+/// 'conectado'"). Un ícono estático distinto sigue cumpliendo el
+/// objetivo (diferenciar el estado a simple vista) sin ese riesgo.
+class _EtaEstadoVisual {
+  final IconData icono;
+  final Color color;
+
+  const _EtaEstadoVisual(this.icono, this.color);
+
+  factory _EtaEstadoVisual.desde({
+    required bool tieneDatos,
+    required EtaConexionEstado conexion,
+  }) {
+    if (tieneDatos) {
+      return const _EtaEstadoVisual(Icons.timer_outlined, AppColors.verdeOscuro);
+    }
+    if (conexion == EtaConexionEstado.error) {
+      return const _EtaEstadoVisual(Icons.error_outline, AppColors.error);
+    }
+    return const _EtaEstadoVisual(Icons.sync, AppColors.verdeOscuro);
+  }
 }
 
 class _EtaWidgetState extends State<EtaWidget> {
@@ -99,51 +151,46 @@ class _EtaWidgetState extends State<EtaWidget> {
             subtitulo = 'Calculando tiempo estimado de llegada...';
           }
 
+          final visual = _EtaEstadoVisual.desde(
+            tieneDatos: tieneDatos,
+            conexion: vm.conexion,
+          );
+
           return Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
-              color: AppColors.verdeOscuro.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: AppColors.verdeOscuro.withValues(alpha: 0.3),
-              ),
+              color: visual.color.withValues(alpha: 0.08),
+              borderRadius: AppRadius.borderMd,
+              border: Border.all(color: visual.color.withValues(alpha: 0.3)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  key: const ValueKey('eta_icono_box'),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
-                    color: AppColors.verdeOscuro,
-                    borderRadius: BorderRadius.circular(10),
+                    color: visual.color,
+                    borderRadius: AppRadius.borderSm,
                   ),
-                  child: const Icon(
-                    Icons.timer_outlined,
-                    color: Colors.white,
-                    size: 22,
-                  ),
+                  child: Icon(visual.icono, color: Colors.white, size: 22),
                 ),
-                const SizedBox(width: 12),
+                AppSpacing.gapMd,
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Tiempo estimado de llegada',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.negroTexto,
-                          fontSize: 14,
-                        ),
+                        style: AppTextStyles.cuerpo
+                            .copyWith(fontWeight: FontWeight.bold),
                       ),
-                      const SizedBox(height: 4),
+                      AppSpacing.gapXs,
                       Text(
                         subtitulo,
-                        style: TextStyle(
-                          color: Colors.grey.shade700,
-                          fontSize: 13,
-                        ),
+                        style: AppTextStyles.cuerpoPequeno
+                            .copyWith(color: Colors.grey.shade700),
                       ),
                     ],
                   ),

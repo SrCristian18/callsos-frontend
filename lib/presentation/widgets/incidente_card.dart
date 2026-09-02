@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_radius.dart';
+import '../../core/app_spacing.dart';
+import '../../core/app_text_styles.dart';
 import '../../core/colores_app.dart';
 import '../../data/models/incidente.dart';
 import '../../data/models/tipo_incidente_presentacion.dart';
@@ -15,6 +18,20 @@ import 'estado_chip.dart';
 /// - Fecha, descripción y CAI asignado (si existe).
 /// - Callback [onTap] para navegar a [DetalleIncidenteView] (F.2).
 /// - Callback [onAccion] opcional para acciones contextuales por rol.
+///
+/// EPIC-09 (Design System, auditoría UX/UI) — jerarquía visual: hasta
+/// esta épica cada tamaño/radio/espaciado de esta card era un número
+/// suelto elegido a mano (18, 14, 12, 11, 10...), sin relación con los
+/// tokens que EPIC-01 ya había definido (`AppRadius`/`AppSpacing`/
+/// `AppTextStyles`) — de hecho EPIC-01 documenta textualmente que
+/// "ningún widget existente los usa todavía" y que migrar vista por
+/// vista "es trabajo de las épicas de UI (EPIC-06 en adelante)". Esta
+/// es esa migración para `IncidenteCard`. El cambio más deliberado es
+/// el título: pasa de 15px/bold a `AppTextStyles.tituloMediano`
+/// (18px/w600 — el token pensado exactamente para "títulos de card"),
+/// para que se distinga más claramente de la descripción y los
+/// metadatos — el hallazgo original de la auditoría era justamente
+/// "mismo peso tipográfico en todo".
 class IncidenteCard extends StatelessWidget {
   final Incidente incidente;
   final VoidCallback? onTap;
@@ -42,10 +59,10 @@ class IncidenteCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: AppRadius.borderLg,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.06),
@@ -65,56 +82,55 @@ class IncidenteCard extends StatelessWidget {
                   height: 52,
                   decoration: BoxDecoration(
                     color: color,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: AppRadius.borderMd,
                   ),
                   child: Icon(icono, color: Colors.white, size: 26),
                 ),
-                const SizedBox(width: 12),
+                AppSpacing.gapMd,
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         titulo,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: AppColors.negroTexto,
-                        ),
+                        style: AppTextStyles.tituloMediano,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 3),
                       Text(
                         incidente.descripcion.isNotEmpty
                             ? incidente.descripcion
                             : (presentacion?.descripcion ?? ''),
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        style: AppTextStyles.cuerpoPequeno
+                            .copyWith(color: Colors.grey.shade600),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                AppSpacing.gapSm,
                 EstadoChip(estado: incidente.estado),
               ],
             ),
-            const SizedBox(height: 10),
+            AppSpacing.gapMd,
             Row(
               children: [
                 Icon(Icons.calendar_today_outlined, size: 13, color: Colors.grey.shade500),
                 const SizedBox(width: 4),
                 Text(
                   _formatearFecha(incidente.fechaHora),
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  style: AppTextStyles.etiqueta.copyWith(color: Colors.grey.shade600),
                 ),
                 if (incidente.nombreCAI != null) ...[
-                  const SizedBox(width: 10),
+                  AppSpacing.gapMd,
                   Icon(Icons.domain_outlined, size: 13, color: Colors.grey.shade500),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       incidente.nombreCAI!,
-                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                      style: AppTextStyles.etiqueta.copyWith(color: Colors.grey.shade600),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -122,7 +138,7 @@ class IncidenteCard extends StatelessWidget {
               ],
             ),
             if (labelAccion != null) ...[
-              const SizedBox(height: 10),
+              AppSpacing.gapMd,
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -131,13 +147,12 @@ class IncidenteCard extends StatelessWidget {
                     backgroundColor: AppColors.negroTexto,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: AppRadius.borderSm),
                   ),
                   child: Text(
                     labelAccion!,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    style: AppTextStyles.cuerpoPequeno
+                        .copyWith(fontWeight: FontWeight.w600, color: Colors.white),
                   ),
                 ),
               ),
