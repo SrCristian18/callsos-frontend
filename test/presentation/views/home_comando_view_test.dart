@@ -27,6 +27,11 @@ import 'package:CallSos/presentation/views/home_comando_view.dart';
 /// ahí más allá de que el texto exista), y el ícono de llave abre un
 /// diálogo para generar invitaciones de agente (ICaiService
 /// .generarInvitacion) — flujo exclusivo de este rol.
+///
+/// EPIC-12 (Design System, auditoría UX/UI) — el aviso de "Delegados"
+/// se rediseñó para comunicar HONESTAMENTE que es una función pendiente
+/// de backend (hallazgo #14), no una lista vacía normal — ver el grupo
+/// "aviso 'Delegados' mejorado (EPIC-12)" más abajo.
 class MockAuthService extends Mock implements IAuthService {}
 
 class MockIncidenteService extends Mock implements IIncidenteService {}
@@ -119,6 +124,92 @@ void main() {
       find.textContaining('requiere un endpoint adicional en el backend'),
       findsOneWidget,
     );
+  });
+
+  // EPIC-12 — "Delegados" ahora es honesto sobre POR QUÉ está vacío: no
+  // es "todavía no hay datos" (lista vacía normal), es "esta función no
+  // está construida" (hallazgo #14, REQUIERE CAMBIO DE BACKEND).
+  group('aviso "Delegados" mejorado (EPIC-12)', () {
+    testWidgets(
+        'el panel se identifica explícitamente como pendiente de backend, '
+        'no como una lista vacía', (tester) async {
+      when(() => incidenteService.porEstado(EstadoIncidente.CREADO))
+          .thenAnswer((_) async => []);
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delegados'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Historial de derivaciones — pendiente de backend'),
+          findsOneWidget);
+      expect(find.textContaining('hallazgo #14'), findsOneWidget);
+      expect(find.byIcon(Icons.construction_outlined), findsOneWidget);
+    });
+
+    testWidgets('el panel da una guía práctica accionable mientras tanto',
+        (tester) async {
+      when(() => incidenteService.porEstado(EstadoIncidente.CREADO))
+          .thenAnswer((_) async => []);
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delegados'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('abrí el detalle de un incidente'),
+        findsOneWidget,
+      );
+      expect(find.byIcon(Icons.lightbulb_outline), findsOneWidget);
+    });
+
+    testWidgets(
+        'el aviso NO aparece en la pestaña "Reportados" (solo afecta a '
+        '"Delegados")', (tester) async {
+      when(() => incidenteService.porEstado(EstadoIncidente.CREADO))
+          .thenAnswer((_) async => [_fake('i-001', EstadoIncidente.CREADO)]);
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+
+      // Tab inicial es "Reportados" — el panel de "pendiente de backend"
+      // no debería estar visible acá.
+      expect(find.text('Historial de derivaciones — pendiente de backend'),
+          findsNothing);
+      expect(find.text('Derivar a CAI'), findsOneWidget);
+    });
+
+    // FIX: regresión del bug real reportado tras el primer intento de
+    // esta épica — el panel completo (ícono, título, párrafo, divider,
+    // tip) es más alto que el aviso plano de una línea que reemplazó,
+    // y el TabBarView le da a cada tab una altura FIJA (no scrolleable
+    // por sí sola). Sin `SingleChildScrollView` envolviendo el panel,
+    // esto desbordaba ("RenderFlex overflowed... 130 pixels on the
+    // bottom") en cualquier pantalla sin sobra vertical — incluido el
+    // tamaño de test por defecto. Este test fija ese escenario: una
+    // pantalla de altura reducida (menos alta que el tamaño de test
+    // default) donde el contenido NO entra sin scroll.
+    testWidgets(
+        'el panel de "Delegados" no desborda en pantallas de poca altura '
+        '(scrollea en vez de desbordar)', (tester) async {
+      tester.view.physicalSize = const Size(400, 560);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      when(() => incidenteService.porEstado(EstadoIncidente.CREADO))
+          .thenAnswer((_) async => []);
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delegados'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Historial de derivaciones — pendiente de backend'),
+          findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   });
 
   testWidgets(
