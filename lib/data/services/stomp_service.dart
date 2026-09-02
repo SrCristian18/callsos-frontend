@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:stomp_dart_client/stomp_dart_client.dart';
 
 import '../../core/app_config.dart';
+import '../models/actualizacion_mensaje.dart';
 import '../models/eta_info.dart';
 import '../services/token_provider.dart';
 
@@ -90,7 +91,26 @@ abstract class IStompService {
     required void Function(EtaInfo) onMensaje,
   });
 
-  /// Cancela TODAS las suscripciones activas (ubicación y/o ETA).
+  /// Épica 8 (hallazgo #4): suscribe a las actualizaciones en vivo de un
+  /// incidente — hoy, solo cambios de tipo (ver
+  /// `ActualizacionIncidenteWebSocketListener.onTipoActualizado`,
+  /// backend). Permite que CAI/Agente/Comando vean el cambio sin
+  /// necesidad de refrescar manualmente la pantalla de detalle.
+  ///
+  /// Igual que [suscribirEta], este topic no requiere autorización
+  /// especial de SUBSCRIBE en el backend (ver
+  /// `ActualizacionIncidenteWebSocketListener`): quien ya conoce el
+  /// incidenteId puede consultarlo también por REST, este topic solo
+  /// evita el polling.
+  ///
+  /// Destino: `/topic/incidente/{incidenteId}/actualizaciones`
+  void suscribirActualizaciones({
+    required String incidenteId,
+    required void Function(ActualizacionMensaje) onMensaje,
+  });
+
+  /// Cancela TODAS las suscripciones activas (ubicación, ETA y/o
+  /// actualizaciones).
   void cancelarSuscripcion();
 
   /// Envía la posición GPS del agente al backend.
@@ -158,6 +178,7 @@ class StompService implements IStompService {
   StompClient? _client;
   StompUnsubscribe? _suscripcionUbicacion;
   StompUnsubscribe? _suscripcionEta;
+  StompUnsubscribe? _suscripcionActualizaciones;
   bool _conectado = false;
 
   StompService({
@@ -173,7 +194,22 @@ class StompService implements IStompService {
     required VoidCallback onConnected,
     required void Function(String error) onError,
   }) async {
-    if (_conectado) return;
+    // FIX (Épica 8, hallazgo #4): antes, si ya había una conexión activa
+    // (`_conectado == true`), este método retornaba sin invocar
+    // `onConnected` — inofensivo mientras solo UN widget a la vez llamaba
+    // `conectar()` sobre esta instancia compartida (ver `AppProviders`),
+    // pero dejó de serlo en cuanto `DetalleIncidenteView` empezó a
+    // conectar también (para `/actualizaciones`) en la MISMA pantalla
+    // donde `EtaWidget` ya conecta (para `/eta`): si el primero terminaba
+    // de conectar antes de que el segundo llamara `conectar()`, el
+    // segundo jamás recibía su `onConnected` y quedaba sin suscribirse.
+    // Ahora, si ya está conectado, se invoca `onConnected` de inmediato
+    // — múltiples consumidores de la misma conexión compartida quedan
+    // correctamente notificados sin abrir sockets adicionales.
+    if (_conectado) {
+      onConnected();
+      return;
+    }
 
     final token = tokenProvider?.token;
     final stompHeaders = <String, String>{
@@ -266,11 +302,35 @@ class StompService implements IStompService {
   }
 
   @override
+  void suscribirActualizaciones({
+    required String incidenteId,
+    required void Function(ActualizacionMensaje) onMensaje,
+  }) {
+    if (_client == null || !_conectado) return;
+
+    _suscripcionActualizaciones = _client!.subscribe(
+      destination: '/topic/incidente/$incidenteId/actualizaciones',
+      callback: (frame) {
+        if (frame.body == null || frame.body!.isEmpty) return;
+        try {
+          final json = jsonDecode(frame.body!) as Map<String, dynamic>;
+          onMensaje(ActualizacionMensaje.fromJson(json));
+        } catch (_) {
+          // Payload malformado — ignorar silenciosamente, mismo criterio
+          // que suscribirEta/suscribirUbicacionAgente.
+        }
+      },
+    );
+  }
+
+  @override
   void cancelarSuscripcion() {
     _suscripcionUbicacion?.call();
     _suscripcionUbicacion = null;
     _suscripcionEta?.call();
     _suscripcionEta = null;
+    _suscripcionActualizaciones?.call();
+    _suscripcionActualizaciones = null;
   }
 
   @override
