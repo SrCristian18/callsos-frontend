@@ -12,6 +12,8 @@ import '../../data/services/incidente_service.dart';
 import 'package:CallSos/data/services/stomp_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../viewmodels/tracking_viewmodel.dart';
+import '../widgets/error_view.dart';
+import '../widgets/loading_view.dart';
 
 /// Vista de seguimiento en tiempo real del agente en camino.
 ///
@@ -36,6 +38,14 @@ import '../viewmodels/tracking_viewmodel.dart';
 /// 3. Muestra [FlutterMap] con tiles OpenStreetMap y los marcadores:
 ///    - 🔴 Punto de la emergencia (coordenadas del incidente).
 ///    - 🔵 Agente (actualizado en tiempo real vía STOMP).
+///
+/// EPIC-11 (Design System, auditoría UX/UI) — "Experiencia del Operador
+/// CAI" (vista afectada en modo receptor: CAI/COMANDO): los estados de
+/// carga/error de `_buildBody()` ahora usan `LoadingView`/`ErrorView`
+/// (EPIC-03), consistente con el resto de la app — antes eran un bloque
+/// ícono+mensaje+botón escrito a mano acá, distinto del que ya usaban
+/// `DetalleIncidenteView`/`IncidenteListBody`. Presentación únicamente:
+/// [_inicializar] y [TrackingViewModel] no cambian.
 class TrackingView extends StatefulWidget {
   const TrackingView({super.key});
 
@@ -191,47 +201,28 @@ class _TrackingViewState extends State<TrackingView> {
   }
 
   Widget _buildBody() {
+    // EPIC-11 (Design System, auditoría UX/UI) — mismo componente
+    // reutilizable (`LoadingView`/`ErrorView`, EPIC-03) que ya migraron
+    // `DetalleIncidenteView`/`IncidenteListBody` en EPIC-09/10, en vez
+    // del bloque ícono+mensaje+botón escrito a mano que tenía esta
+    // vista. Solo cambia la presentación — ninguna de las dos ramas
+    // toca `_inicializar()`/`TrackingViewModel` (lógica de GPS/STOMP).
     if (_cargandoIncidente) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.verdeOscuro),
-      );
+      return const LoadingView();
     }
 
     if (_errorCarga != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.wifi_off_outlined,
-                  size: 52, color: Colors.grey.shade400),
-              const SizedBox(height: 16),
-              Text(_errorCarga!,
-                  textAlign: TextAlign.center,
-                  style:
-                      TextStyle(color: Colors.grey.shade600, fontSize: 14)),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.refresh),
-                label: const Text('Reintentar'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.verdeOscuro,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _cargandoIncidente = true;
-                    _errorCarga = null;
-                  });
-                  if (_incidenteId != null && _agenteId != null) {
-                    _inicializar(_incidenteId!, _agenteId!);
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
+      return ErrorView(
+        message: _errorCarga!,
+        onRetry: () {
+          setState(() {
+            _cargandoIncidente = true;
+            _errorCarga = null;
+          });
+          if (_incidenteId != null && _agenteId != null) {
+            _inicializar(_incidenteId!, _agenteId!);
+          }
+        },
       );
     }
 
