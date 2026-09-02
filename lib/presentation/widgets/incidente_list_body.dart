@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import '../../core/colores_app.dart';
 import '../../data/models/incidente.dart';
 import '../viewmodels/incidente_list_viewmodel.dart';
+import 'empty_state.dart';
+import 'error_view.dart';
 import 'incidente_card.dart';
+import 'loading_view.dart';
 
 /// Widget que renderiza el cuerpo de una lista de incidentes según el estado
 /// del [IncidenteListViewModel].
@@ -11,10 +14,21 @@ import 'incidente_card.dart';
 /// F.2 — Compartido entre todas las Home views por rol.
 ///
 /// Maneja:
-/// - Loading inicial: skeleton/spinner centrado.
-/// - Error: mensaje + botón "Reintentar".
-/// - Lista vacía: ícono + mensaje contextual.
+/// - Loading inicial: [LoadingView].
+/// - Error (sin datos previos): [ErrorView] con botón "Reintentar".
+/// - Lista vacía: [EmptyState].
 /// - Lista con datos: [RefreshIndicator] + [ListView] de [IncidenteCard].
+///
+/// EPIC-09 (Design System, auditoría UX/UI) — checklist §18
+/// (loading/success/error/empty): antes cada uno de estos 3 estados
+/// tenía acá su propio bloque `Center(Padding(Column(Icon+Text+...)))`
+/// escrito a mano, prácticamente idéntico (mismo ícono, mismos tonos de
+/// gris, mismo botón "Reintentar") al que EPIC-03 ya había extraído a
+/// [LoadingView]/[ErrorView]/[EmptyState] — pero sin conectarlos acá
+/// todavía (ver el comentario de cada uno: "hoy se repite... en
+/// incidente_list_body.dart"). Este fix es exactamente esa conexión:
+/// ningún comportamiento nuevo, mismo resultado visual, una sola fuente
+/// de verdad para los 3 estados en toda la app.
 ///
 /// [buildCard] permite que cada Home personalice la card (con distintas
 /// acciones y etiquetas de botón según el rol).
@@ -42,61 +56,25 @@ class IncidenteListBody extends StatelessWidget {
   Widget build(BuildContext context) {
     // Loading inicial
     if (vm.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.verdeOscuro),
-      );
+      return const LoadingView();
     }
 
-    // Error
+    // Error (sin datos previos que mostrar)
     if (vm.errorMessage != null && incidentes.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.wifi_off_outlined, size: 52, color: Colors.grey.shade400),
-              const SizedBox(height: 16),
-              Text(
-                vm.errorMessage!,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.refresh),
-                label: const Text('Reintentar'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.verdeOscuro,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: vm.cargar,
-              ),
-            ],
-          ),
-        ),
-      );
+      return ErrorView(message: vm.errorMessage!, onRetry: vm.cargar);
     }
 
     // Lista vacía
     if (incidentes.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(iconoVacio, size: 64, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
-            Text(
-              mensajeVacio,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 15),
-            ),
-          ],
-        ),
-      );
+      return EmptyState(icon: iconoVacio, message: mensajeVacio);
     }
 
-    // Error inline (hay datos pero la última operación falló)
+    // Error inline (hay datos pero la última operación falló) — no es
+    // uno de los 4 estados del checklist (ese ya está cubierto arriba,
+    // para cuando NO hay datos); acá sigue siendo un banner propio
+    // porque conceptualmente es distinto: "success con una advertencia
+    // encima", no un ErrorView de página completa que reemplazaría la
+    // lista que el usuario sigue pudiendo ver y usar.
     return Column(
       children: [
         if (vm.errorMessage != null)

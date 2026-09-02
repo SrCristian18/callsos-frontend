@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_config.dart';
+import '../../core/app_radius.dart';
 import '../../core/app_routes.dart';
+import '../../core/app_spacing.dart';
+import '../../core/app_text_styles.dart';
 import '../../core/colores_app.dart';
 import '../../data/models/enums/estado_incidente.dart';
 import '../../data/models/enums/rol.dart';
@@ -12,8 +15,11 @@ import '../../data/services/api_exception.dart';
 import '../../data/services/incidente_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_snackbar.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/error_view.dart';
 import '../widgets/estado_chip.dart';
 import '../widgets/eta_widget.dart';
+import '../widgets/loading_view.dart';
 import '../widgets/selector_tipo_incidente.dart';
 import '../widgets/timeline.dart';
 
@@ -193,40 +199,40 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
   }
 
   Widget _buildBody() {
+    // EPIC-09 (Design System, auditoría UX/UI) — checklist §18
+    // (loading/success/error/empty), igual que `IncidenteListBody`: los
+    // 3 estados sin datos pasan a usar los componentes de EPIC-03 en vez
+    // de bloques hechos a mano, mismo resultado visible de antes.
     if (_isLoading) {
-      return const Center(
-          child: CircularProgressIndicator(color: AppColors.verdeOscuro));
+      return const LoadingView(mensaje: 'Cargando incidente...');
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 52, color: Colors.grey.shade400),
-              const SizedBox(height: 16),
-              Text(_error!,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: Colors.grey.shade600, fontSize: 14)),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.refresh),
-                label: const Text('Reintentar'),
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.verdeOscuro,
-                    foregroundColor: Colors.white),
-                onPressed: _cargar,
-              ),
-            ],
-          ),
-        ),
+      // `icon` explícito: a diferencia de `IncidenteListBody` (donde el
+      // error casi siempre es de conectividad, de ahí el ícono por
+      // defecto de `ErrorView`), acá `_error` también puede venir de un
+      // 404/403 (`ApiException` de negocio, no de red) — `error_outline`
+      // es correcto para ambos casos, `wifi_off_outlined` no lo sería
+      // para el primero.
+      return ErrorView(
+        message: _error!,
+        icon: Icons.error_outline,
+        onRetry: _cargar,
       );
     }
 
-    if (_incidente == null) return const SizedBox();
+    if (_incidente == null) {
+      // Caso borde: ni loading, ni error, ni incidente — no debería
+      // darse en el flujo normal (la carga siempre deja el ViewModel en
+      // uno de los otros 3 estados), pero antes de EPIC-09 esta rama
+      // devolvía un `SizedBox()` — una pantalla en blanco sin ninguna
+      // explicación si alguna vez se llegara a pisar. `EmptyState` le da
+      // a ese caso borde el mismo tratamiento que el resto del checklist.
+      return const EmptyState(
+        icon: Icons.help_outline,
+        message: 'No se encontró información de este incidente.',
+      );
+    }
 
     final inc = _incidente!;
     final sesion = context.read<SesionViewModel>();
@@ -252,17 +258,17 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
   Widget _buildDetalle(Incidente inc, Rol? rol, IIncidenteService service,
       SesionViewModel sesion, TipoIncidentePresentacion? pres) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Card principal ──────────────────────────────────────────
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(AppSpacing.xl),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: AppRadius.borderLg,
               boxShadow: [
                 BoxShadow(
                     color: Colors.black.withValues(alpha: 0.06),
@@ -280,24 +286,26 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
                     height: 52,
                     decoration: BoxDecoration(
                       color: pres?.color ?? Colors.grey,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: AppRadius.borderMd,
                     ),
                     child: Icon(pres?.icono ?? Icons.warning,
                         color: Colors.white, size: 26),
                   ),
-                  const SizedBox(width: 14),
+                  AppSpacing.gapMd,
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // EPIC-09: mismo token que el título de
+                        // `IncidenteCard` — el nombre del tipo de
+                        // incidente es la MISMA pieza de información en
+                        // ambas vistas, así que debe verse igual de
+                        // prominente en las dos.
                         Text(
                           pres?.titulo ?? inc.tipo.name,
-                          style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.negroTexto),
+                          style: AppTextStyles.tituloMediano,
                         ),
-                        const SizedBox(height: 4),
+                        AppSpacing.gapXs,
                         EstadoChip(estado: inc.estado),
                       ],
                     ),
@@ -305,15 +313,14 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
                 ]),
 
                 if (inc.descripcion.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const Text('Descripción',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.negroTexto)),
-                  const SizedBox(height: 4),
+                  AppSpacing.gapLg,
+                  Text('Descripción',
+                      style: AppTextStyles.cuerpo
+                          .copyWith(fontWeight: FontWeight.w600)),
+                  AppSpacing.gapXs,
                   Text(inc.descripcion,
-                      style: TextStyle(
-                          color: Colors.grey.shade700, fontSize: 14)),
+                      style: AppTextStyles.cuerpo
+                          .copyWith(color: Colors.grey.shade700)),
                 ],
 
                 const Divider(height: 28),
@@ -321,12 +328,12 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
                 // Metadatos
                 _fila(Icons.calendar_today_outlined, 'Fecha y hora',
                     _fecha(inc.fechaHora)),
-                const SizedBox(height: 10),
+                AppSpacing.gapSm,
                 _fila(Icons.location_on_outlined, 'Coordenadas GPS',
                     '${inc.latitud.toStringAsFixed(5)}, '
                         '${inc.longitud.toStringAsFixed(5)}'),
                 if (inc.nombreCAI != null) ...[
-                  const SizedBox(height: 10),
+                  AppSpacing.gapSm,
                   _fila(Icons.domain_outlined, 'CAI asignado',
                       inc.nombreCAI!),
                 ],
@@ -334,7 +341,7 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
             ),
           ),
 
-          const SizedBox(height: 20),
+          AppSpacing.gapXl,
 
           // ── Widget de ETA (Épica 7) ──────────────────────────────────
           // Solo para el DENUNCIANTE, y solo mientras hay un agente en
@@ -343,18 +350,20 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
           if (rol == Rol.DENUNCIANTE &&
               inc.estado == EstadoIncidente.AGENTE_EN_CAMINO) ...[
             EtaWidget(incidenteId: inc.id),
-            const SizedBox(height: 20),
+            AppSpacing.gapXl,
           ],
 
           // ── Botones contextuales ────────────────────────────────────
+          // EPIC-09: mismo LoadingView del checklist §18 en vez del
+          // `CircularProgressIndicator` suelto de antes — este es el
+          // sub-estado "procesando" de una transición (Ir en camino,
+          // Cancelar, etc.), no loading de PÁGINA completa, por eso lleva
+          // mensaje propio en vez de reusar "Cargando incidente...".
           if (!_enProceso) ..._botonesContextuales(inc, rol, service, sesion.actorId)
           else
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(
-                    color: AppColors.verdeOscuro),
-              ),
+            const Padding(
+              padding: EdgeInsets.all(AppSpacing.lg),
+              child: LoadingView(mensaje: 'Procesando...'),
             ),
         ],
       ),
@@ -601,19 +610,14 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 18, color: Colors.grey.shade500),
-        const SizedBox(width: 10),
+        AppSpacing.gapSm,
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label,
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade500,
-                      fontWeight: FontWeight.w500)),
-              Text(value,
-                  style: const TextStyle(
-                      fontSize: 14, color: AppColors.negroTexto)),
+                  style: AppTextStyles.etiqueta.copyWith(color: Colors.grey.shade500)),
+              Text(value, style: AppTextStyles.cuerpo),
             ],
           ),
         ),
