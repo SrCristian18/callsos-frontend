@@ -5,7 +5,9 @@ import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_password_field.dart';
+import '../widgets/auth_error_banner.dart';
 import '../widgets/custom_input.dart';
+import '../widgets/primary_loading_button.dart';
 
 /// Registro de agente mediante token de invitación generado por Comando.
 ///
@@ -19,6 +21,10 @@ import '../widgets/custom_input.dart';
 /// Habla directo con [SesionViewModel.registrarAgente] (mismo patrón que
 /// [RegisterDenuncianteView]) en vez de RegisterPoliciaViewModel, que
 /// queda sin uso — candidato a retiro en la Épica 3 (limpieza de legacy).
+///
+/// EPIC-13 (Design System, auditoría UX/UI) — error y botón de carga
+/// migrados a [AuthErrorBanner]/[PrimaryLoadingButton], unificando el
+/// tratamiento visual con [LoginView] y las demás pantallas de auth.
 class RegisterPoliciaView extends StatefulWidget {
   const RegisterPoliciaView({super.key});
 
@@ -146,28 +152,16 @@ class _RegisterPoliciaViewState extends State<RegisterPoliciaView> {
 
                   if (sesion.errorMessage != null) ...[
                     const SizedBox(height: 8),
-                    Text(
-                      sesion.errorMessage!,
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
+                    AuthErrorBanner(mensaje: sesion.errorMessage!),
                   ],
 
                   const SizedBox(height: 16),
 
-                  sesion.isLoading
-                      ? const CircularProgressIndicator()
-                      : ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.verdeOscuro,
-                            minimumSize: const Size(double.infinity, 50),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(25)),
-                          ),
-                          onPressed: () => _onRegistrarPressed(sesion),
-                          child: const Text('Registrar',
-                              style: TextStyle(color: Colors.white)),
-                        ),
+                  PrimaryLoadingButton(
+                    label: 'Registrar',
+                    isLoading: sesion.isLoading,
+                    onPressed: () => _onRegistrarPressed(sesion),
+                  ),
                 ],
               );
             },

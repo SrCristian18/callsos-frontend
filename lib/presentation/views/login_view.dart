@@ -8,7 +8,9 @@ import '../../data/models/enums/rol.dart';
 import '../../data/services/notificacion_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_password_field.dart';
+import '../widgets/auth_error_banner.dart';
 import '../widgets/custom_input.dart';
+import '../widgets/primary_loading_button.dart';
 
 /// Login del denunciante.
 ///
@@ -18,6 +20,12 @@ import '../widgets/custom_input.dart';
 /// La vista anterior usaba [LoginViewModel] (mock). Ahora usa el mismo
 /// [SesionViewModel] que [LoginPoliciaView] — mismo patrón, distinta ruta
 /// de destino (DENUNCIANTE → [HomeDenuncianteView]).
+///
+/// EPIC-13 (Design System, auditoría UX/UI) — error y botón de carga
+/// migrados a [AuthErrorBanner]/[PrimaryLoadingButton] (widgets
+/// compartidos nuevos), en vez de los bloques a mano que tenía antes —
+/// mismo tratamiento visual que ya usan [LoginPoliciaView],
+/// [RegisterDenuncianteView] y [RegisterPoliciaView].
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
 
@@ -105,28 +113,16 @@ class _LoginViewState extends State<LoginView> {
 
                   if (sesion.errorMessage != null) ...[
                     const SizedBox(height: 8),
-                    Text(
-                      sesion.errorMessage!,
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
+                    AuthErrorBanner(mensaje: sesion.errorMessage!),
                   ],
 
                   const SizedBox(height: 10),
 
-                  sesion.isLoading
-                      ? const CircularProgressIndicator()
-                      : ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.verdeOscuro,
-                            minimumSize: const Size(double.infinity, 50),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(25)),
-                          ),
-                          onPressed: () => _onLoginPressed(sesion),
-                          child: const Text('Iniciar sesión',
-                              style: TextStyle(color: Colors.white)),
-                        ),
+                  PrimaryLoadingButton(
+                    label: 'Iniciar sesión',
+                    isLoading: sesion.isLoading,
+                    onPressed: () => _onLoginPressed(sesion),
+                  ),
 
                   const SizedBox(height: 14),
                   Center(
