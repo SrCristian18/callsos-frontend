@@ -68,7 +68,11 @@ class ForgotPasswordView extends StatelessWidget {
             const SizedBox(height: 12),
             const Text(
               "Le llegará un correo recuperar su contraseña",
-              style: TextStyle(color: AppColors.verdeClaro, fontSize: 14),
+              // EPIC-14: verdeClaro (#7EAD1F) da 2.58:1 de contraste
+              // sobre blancoVerde — falla AA incluso para texto grande
+              // (mínimo 3:1). verdeTexto es el mismo verde, oscurecido
+              // para pasar AA (4.63:1), sin tocar el swatch de marca.
+              style: TextStyle(color: AppColors.verdeTexto, fontSize: 14),
             ),
             const SizedBox(height: 20),
             Center(

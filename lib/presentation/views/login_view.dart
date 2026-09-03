@@ -133,12 +133,25 @@ class _LoginViewState extends State<LoginView> {
                     child: InkWell(
                       onTap: () => Navigator.pushNamed(
                           context, AppRoutes.forgotPassword),
-                      child: const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: Text(
+                      // EPIC-14: touch target mínimo 48dp — el
+                      // `Padding(8)` de antes daba ~33dp de alto (14sp
+                      // de texto + 16 de padding), por debajo del
+                      // mínimo. `Container` con `constraints.minHeight`
+                      // agranda el área tocable sin cambiar el tamaño
+                      // visible del texto (sigue centrado adentro).
+                      child: Container(
+                        alignment: Alignment.center,
+                        constraints: const BoxConstraints(minHeight: 48),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: const Text(
                           '¿Olvidaste tu contraseña?',
+                          // EPIC-14: verdeClaro (#7EAD1F) da 2.66:1 de
+                          // contraste sobre blanco — falla AA (mínimo
+                          // 4.5:1 texto normal). verdeTexto es el mismo
+                          // verde, oscurecido para pasar AA (4.78:1),
+                          // sin tocar el swatch de marca.
                           style: TextStyle(
-                              color: AppColors.verdeClaro,
+                              color: AppColors.verdeTexto,
                               fontWeight: FontWeight.bold),
                         ),
                       ),

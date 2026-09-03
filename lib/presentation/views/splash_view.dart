@@ -176,8 +176,11 @@ class _SplashViewState extends State<SplashView>
                     position: _textSlide,
                     child: const Text(
                       'Seguridad ciudadana',
+                      // EPIC-14: mismo fix de contraste que en las
+                      // pantallas de login — verdeClaro sobre
+                      // blancoVerde da 2.58:1, falla AA.
                       style:
-                          TextStyle(fontSize: 14, color: AppColors.verdeClaro),
+                          TextStyle(fontSize: 14, color: AppColors.verdeTexto),
                     ),
                   ),
                 ),

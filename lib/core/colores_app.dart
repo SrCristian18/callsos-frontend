@@ -42,4 +42,24 @@ class AppColors{
   // iguales entre light y dark (ver main.dart), solo cambian los fondos.
   static const Color fondoOscuro = Color(0xFF121820); // scaffold + surface
   static const Color superficieOscura = Color(0xFF1B2531); // inputs, cards elevadas
+
+  // ── Accesibilidad — contraste AA (EPIC-14) ──────────────────────────
+  // `verdeClaro` (#7EAD1F) sobre blanco/blancoVerde da 2.58–2.66:1 — muy
+  // por debajo del mínimo AA para texto (4.5:1 texto normal, 3:1 texto
+  // grande ≥18pt/≥14pt-bold; esto no llega ni al umbral de texto
+  // grande). Se usaba como color de TEXTO en 4 pantallas (enlaces
+  // "¿Olvidaste tu contraseña?", subtítulo de `SplashView`) — casos
+  // reales, ya en pantalla, no hipotéticos.
+  //
+  // `verdeTexto` es el mismo verde de marca (mismo matiz/saturación),
+  // solo más oscuro, pensado específicamente para texto/íconos sobre
+  // fondos claros — NO reemplaza a `verdeClaro` en sus demás usos
+  // (íconos decorativos en inputs, `ColorScheme.secondary`, fondos):
+  // `verdeClaro` en sí NO se toca, seguimos el mismo criterio que
+  // EPIC-01 ya estableció para los 4 colores originales ("identidad de
+  // marca ya validada, no se modifica el swatch existente").
+  //
+  // 4.78:1 contra blanco, 4.63:1 contra `blancoVerde` — pasa AA para
+  // texto normal en ambos.
+  static const Color verdeTexto = Color(0xFF5B7D16);
 }

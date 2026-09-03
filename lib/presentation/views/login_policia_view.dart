@@ -176,20 +176,29 @@ class _LoginPoliciaViewState extends State<LoginPoliciaView> {
                   // pero usaba Color(0xFF4CAF50) (verde Material estándar,
                   // ningún AppColors coincide) en vez de un verde de marca
                   // — inconsistencia sin intención aparente entre dos
-                  // pantallas gemelas. Alineado con AppColors.verdeClaro,
-                  // el mismo que usa el link equivalente en LoginView.
+                  // pantallas gemelas. Alineado con AppColors.verdeTexto
+                  // (EPIC-14), el mismo que usa el link equivalente en
+                  // LoginView — verdeClaro (#7EAD1F) da 2.66:1 de
+                  // contraste sobre blanco, muy por debajo del mínimo AA
+                  // para texto (4.5:1); verdeTexto es el mismo verde,
+                  // oscurecido para pasar AA, sin tocar el swatch de marca.
                   Center(
                     child: MouseRegion(
                       cursor: SystemMouseCursors.click,
                       child: InkWell(
                         borderRadius: BorderRadius.circular(5),
                         onTap: () => Navigator.pushNamed(context, '/forgot_password'),
-                        child: const Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: Text(
+                        // EPIC-14: touch target mínimo 48dp (antes ~33dp
+                        // con solo `Padding(8)` — mismo fix que en
+                        // LoginView).
+                        child: Container(
+                          alignment: Alignment.center,
+                          constraints: const BoxConstraints(minHeight: 48),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: const Text(
                             "¿Has olvidado tu contraseña?",
                             style: TextStyle(
-                              color: AppColors.verdeClaro,
+                              color: AppColors.verdeTexto,
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
                             ),

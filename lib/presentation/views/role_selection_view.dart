@@ -69,7 +69,12 @@ class _RoleCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Icon(icon, size: 50, color: AppColors.verdeClaro),
+            // EPIC-14: verdeClaro (#7EAD1F) sobre blanco da 2.66:1 —
+            // falla el mínimo de contraste no-textual de WCAG (3:1),
+            // relevante acá porque este ícono es la elección primaria
+            // de rol, no un adorno secundario. verdeTexto lo resuelve
+            // sin tocar el swatch de marca.
+            Icon(icon, size: 50, color: AppColors.verdeTexto),
             const SizedBox(height: 10),
             Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           ],
