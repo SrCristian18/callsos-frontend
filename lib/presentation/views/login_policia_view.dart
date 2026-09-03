@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_config.dart';
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
 import '../../data/models/enums/rol.dart';
+import '../../data/services/notificacion_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_password_field.dart';
 import '../widgets/auth_error_banner.dart';
@@ -32,6 +34,12 @@ import '../widgets/primary_loading_button.dart';
 /// migrados a [AuthErrorBanner]/[PrimaryLoadingButton] (ver
 /// docstrings), unificando el tratamiento visual con [LoginView],
 /// [RegisterDenuncianteView] y [RegisterPoliciaView].
+///
+/// Épica 8 (hallazgo #5): tras un login exitoso, registra el token FCM
+/// del dispositivo — antes esta vista NUNCA lo hacía (a diferencia de
+/// [LoginView]), a pesar de que el backend soporta `tokenFcm` para
+/// AGENTE y OPERADOR_CAI desde Épica 5. Mismo patrón que [LoginView],
+/// vía [NotificacionService.registrarTokenEnBackend].
 class LoginPoliciaView extends StatefulWidget {
   const LoginPoliciaView({super.key});
 
@@ -82,6 +90,19 @@ class _LoginPoliciaViewState extends State<LoginPoliciaView> {
       // '/incident_view' (comando_widget/jefecai_widget/agente_widget —
       // datos mock en memoria, sin conexión real al backend). Las Home
       // views reales (F.2) ya existen y deben usarse en su lugar.
+
+      // Épica 8 (hallazgo #5): registrar el token FCM tras el login,
+      // igual que ya hace LoginView para DENUNCIANTE. NotificacionService
+      // despacha al servicio correcto según sesion.rol (AGENTE → 
+      // /agentes/{id}/token, OPERADOR_CAI → /cais/{id}/token) y omite
+      // COMANDO silenciosamente (el backend no le da soporte).
+      if (AppConfig.firebaseHabilitado && sesion.rol != null) {
+        context.read<NotificacionService>().registrarTokenEnBackend(
+              actorId: sesion.actorId!,
+              rol: sesion.rol!,
+            );
+      }
+
       Navigator.pushReplacementNamed(context, _rutaPorRol(sesion.rol!));
     }
     // Si falla, sesion.errorMessage ya quedó seteado y el Consumer de abajo
@@ -155,20 +176,29 @@ class _LoginPoliciaViewState extends State<LoginPoliciaView> {
                   // pero usaba Color(0xFF4CAF50) (verde Material estándar,
                   // ningún AppColors coincide) en vez de un verde de marca
                   // — inconsistencia sin intención aparente entre dos
-                  // pantallas gemelas. Alineado con AppColors.verdeClaro,
-                  // el mismo que usa el link equivalente en LoginView.
+                  // pantallas gemelas. Alineado con AppColors.verdeTexto
+                  // (EPIC-14), el mismo que usa el link equivalente en
+                  // LoginView — verdeClaro (#7EAD1F) da 2.66:1 de
+                  // contraste sobre blanco, muy por debajo del mínimo AA
+                  // para texto (4.5:1); verdeTexto es el mismo verde,
+                  // oscurecido para pasar AA, sin tocar el swatch de marca.
                   Center(
                     child: MouseRegion(
                       cursor: SystemMouseCursors.click,
                       child: InkWell(
                         borderRadius: BorderRadius.circular(5),
                         onTap: () => Navigator.pushNamed(context, '/forgot_password'),
-                        child: const Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: Text(
+                        // EPIC-14: touch target mínimo 48dp (antes ~33dp
+                        // con solo `Padding(8)` — mismo fix que en
+                        // LoginView).
+                        child: Container(
+                          alignment: Alignment.center,
+                          constraints: const BoxConstraints(minHeight: 48),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: const Text(
                             "¿Has olvidado tu contraseña?",
                             style: TextStyle(
-                              color: AppColors.verdeClaro,
+                              color: AppColors.verdeTexto,
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
                             ),

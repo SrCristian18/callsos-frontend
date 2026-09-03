@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:stomp_dart_client/stomp_dart_client.dart';
 
+import 'package:CallSos/data/models/actualizacion_mensaje.dart';
 import 'package:CallSos/data/models/eta_info.dart';
 import 'package:CallSos/data/services/stomp_service.dart';
 import 'package:CallSos/data/services/token_provider.dart';
@@ -90,6 +91,42 @@ void main() {
     });
   });
 
+  group('ActualizacionMensaje.fromJson — Épica 8, hallazgo #4', () {
+    test('parsea un payload de cambio de tipo completo', () {
+      final mensaje = ActualizacionMensaje.fromJson({
+        'tipoEvento': 'TIPO_ACTUALIZADO',
+        'valorAnterior': 'ROBOS_O_ASALTOS',
+        'valorNuevo': 'RIÑAS_O_PELEAS',
+        'timestamp': '2026-06-14T10:05:00',
+      });
+
+      expect(mensaje.tipoEvento, 'TIPO_ACTUALIZADO');
+      expect(mensaje.valorAnterior, 'ROBOS_O_ASALTOS');
+      expect(mensaje.valorNuevo, 'RIÑAS_O_PELEAS');
+      expect(mensaje.timestamp, '2026-06-14T10:05:00');
+      expect(mensaje.esTipoActualizado, isTrue);
+    });
+
+    test('tipoEvento distinto de TIPO_ACTUALIZADO: esTipoActualizado es false', () {
+      final mensaje = ActualizacionMensaje.fromJson({
+        'tipoEvento': 'OTRO_EVENTO_FUTURO',
+        'timestamp': '2026-06-14T10:05:00',
+      });
+
+      expect(mensaje.esTipoActualizado, isFalse);
+    });
+
+    test('campos ausentes no lanzan excepción, quedan null/vacíos', () {
+      final mensaje = ActualizacionMensaje.fromJson({});
+
+      expect(mensaje.tipoEvento, '');
+      expect(mensaje.valorAnterior, isNull);
+      expect(mensaje.valorNuevo, isNull);
+      expect(mensaje.timestamp, '');
+      expect(mensaje.esTipoActualizado, isFalse);
+    });
+  });
+
   group('StompService — contrato defensivo (seguro de llamar en cualquier orden)', () {    test('estaConectado empieza en false', () {
       final service = StompService();
       expect(service.estaConectado, isFalse);
@@ -112,6 +149,18 @@ void main() {
 
       expect(
         () => service.suscribirEta(
+          incidenteId: 'i-001',
+          onMensaje: (_) {},
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('suscribirActualizaciones antes de conectar() no lanza excepción (no-op)', () {
+      final service = StompService();
+
+      expect(
+        () => service.suscribirActualizaciones(
           incidenteId: 'i-001',
           onMensaje: (_) {},
         ),
@@ -319,6 +368,24 @@ void main() {
       verify(() => mockClient.activate()).called(1); // no 2
     });
 
+    test('FIX (Épica 8, hallazgo #4): llamar conectar() ya conectado invoca '
+        'onConnected de inmediato — necesario para que múltiples widgets '
+        '(ej. DetalleIncidenteView + EtaWidget) compartan la misma conexión '
+        'STOMP sin que el segundo se quede sin su callback', () async {
+      final service = crearServicio();
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+      expect(service.estaConectado, isTrue);
+
+      var seLlamoSegundoOnConnected = false;
+      await service.conectar(
+        onConnected: () => seLlamoSegundoOnConnected = true,
+        onError: (_) {},
+      );
+
+      expect(seLlamoSegundoOnConnected, isTrue);
+    });
+
     test('enviarUbicacion mientras conectado delega en el cliente con destino y body correctos',
         () async {
       final service = crearServicio();
@@ -497,7 +564,96 @@ void main() {
       expect(recibido?.categoriaDistancia, CategoriaDistancia.ENTRE_1_Y_3_KM);
     });
 
-    test('cancelarSuscripcion cancela tanto ubicación como ETA sin lanzar excepción',
+    test('suscribirActualizaciones se suscribe a /topic/incidente/{incidenteId}/actualizaciones '
+        '(Épica 8, hallazgo #4)', () async {
+      final service = crearServicio();
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+
+      when(() => mockClient.subscribe(
+            destination: any(named: 'destination'),
+            callback: any(named: 'callback'),
+          )).thenReturn(({Map<String, String>? unsubscribeHeaders}) {});
+
+      service.suscribirActualizaciones(incidenteId: 'i-001', onMensaje: (_) {});
+
+      final captura = verify(() => mockClient.subscribe(
+            destination: captureAny(named: 'destination'),
+            callback: any(named: 'callback'),
+          )).captured;
+      expect(captura.single, '/topic/incidente/i-001/actualizaciones');
+    });
+
+    test('suscribirActualizaciones decodifica el frame recibido y lo pasa a onMensaje '
+        '(Épica 8, hallazgo #4)', () async {
+      final service = crearServicio();
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+
+      void Function(StompFrame)? callbackCapturado;
+      when(() => mockClient.subscribe(
+            destination: any(named: 'destination'),
+            callback: any(named: 'callback'),
+          )).thenAnswer((invocacion) {
+        callbackCapturado =
+            invocacion.namedArguments[#callback] as void Function(StompFrame);
+        return ({Map<String, String>? unsubscribeHeaders}) {};
+      });
+
+      ActualizacionMensaje? recibido;
+      service.suscribirActualizaciones(
+        incidenteId: 'i-001',
+        onMensaje: (m) => recibido = m,
+      );
+
+      callbackCapturado!(StompFrame(
+        command: 'MESSAGE',
+        body: jsonEncode({
+          'tipoEvento': 'TIPO_ACTUALIZADO',
+          'valorAnterior': 'ROBOS_O_ASALTOS',
+          'valorNuevo': 'RIÑAS_O_PELEAS',
+          'timestamp': '2026-06-14T10:05:00',
+        }),
+      ));
+
+      expect(recibido?.tipoEvento, 'TIPO_ACTUALIZADO');
+      expect(recibido?.valorNuevo, 'RIÑAS_O_PELEAS');
+      expect(recibido?.esTipoActualizado, isTrue);
+    });
+
+    test('suscribirActualizaciones con payload malformado no lanza excepción '
+        '(se ignora, mismo criterio que suscribirEta)', () async {
+      final service = crearServicio();
+
+      await service.conectar(onConnected: () {}, onError: (_) {});
+      configCapturada.onConnect(StompFrame(command: 'CONNECTED'));
+
+      void Function(StompFrame)? callbackCapturado;
+      when(() => mockClient.subscribe(
+            destination: any(named: 'destination'),
+            callback: any(named: 'callback'),
+          )).thenAnswer((invocacion) {
+        callbackCapturado =
+            invocacion.namedArguments[#callback] as void Function(StompFrame);
+        return ({Map<String, String>? unsubscribeHeaders}) {};
+      });
+
+      var seLlamoOnMensaje = false;
+      service.suscribirActualizaciones(
+        incidenteId: 'i-001',
+        onMensaje: (_) => seLlamoOnMensaje = true,
+      );
+
+      expect(
+        () => callbackCapturado!(StompFrame(command: 'MESSAGE', body: 'no-es-json')),
+        returnsNormally,
+      );
+      expect(seLlamoOnMensaje, isFalse);
+    });
+
+    test('cancelarSuscripcion cancela ubicación, ETA y actualizaciones sin lanzar excepción',
         () async {
       final service = crearServicio();
 
@@ -506,6 +662,7 @@ void main() {
 
       var canceladaUbicacion = false;
       var canceladaEta = false;
+      var canceladaActualizaciones = false;
       when(() => mockClient.subscribe(
             destination: '/topic/agente/ag-001/ubicacion',
             callback: any(named: 'callback'),
@@ -514,14 +671,20 @@ void main() {
             destination: '/topic/incidente/i-001/eta',
             callback: any(named: 'callback'),
           )).thenReturn(({Map<String, String>? unsubscribeHeaders}) => canceladaEta = true);
+      when(() => mockClient.subscribe(
+            destination: '/topic/incidente/i-001/actualizaciones',
+            callback: any(named: 'callback'),
+          )).thenReturn(({Map<String, String>? unsubscribeHeaders}) => canceladaActualizaciones = true);
 
       service.suscribirUbicacionAgente(agenteId: 'ag-001', onMensaje: (_) {});
       service.suscribirEta(incidenteId: 'i-001', onMensaje: (_) {});
+      service.suscribirActualizaciones(incidenteId: 'i-001', onMensaje: (_) {});
 
       service.cancelarSuscripcion();
 
       expect(canceladaUbicacion, isTrue);
       expect(canceladaEta, isTrue);
+      expect(canceladaActualizaciones, isTrue);
     });
   });
 }

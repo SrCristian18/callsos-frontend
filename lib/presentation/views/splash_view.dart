@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../core/app_config.dart';
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
-import '../../data/models/enums/rol.dart';
 import '../../data/services/notificacion_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 
@@ -109,13 +108,22 @@ class _SplashViewState extends State<SplashView>
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!context.mounted) return;
 
-            // F.5 — Si es DENUNCIANTE autenticado, registrar/actualizar
+            // F.5 — Si hay sesión autenticada, registrar/actualizar el
             // token FCM. Solo si Firebase está habilitado (ver AppConfig).
+            //
+            // Épica 8 (hallazgo #5): antes esto solo se disparaba para
+            // DENUNCIANTE — si un AGENTE u OPERADOR_CAI cerraba y volvía
+            // a abrir la app (sesión restaurada acá, sin pasar de nuevo
+            // por login), su tokenFcm quedaba desactualizado o nunca
+            // registrado. `NotificacionService` ya despacha al servicio
+            // correcto según el rol (y omite COMANDO), así que basta con
+            // quitar la restricción a DENUNCIANTE.
             if (AppConfig.firebaseHabilitado &&
                 sesion.isAuthenticated &&
-                sesion.rol == Rol.DENUNCIANTE) {
+                sesion.rol != null) {
               context.read<NotificacionService>().registrarTokenEnBackend(
                     actorId: sesion.actorId!,
+                    rol: sesion.rol!,
                   );
             }
 
@@ -168,8 +176,11 @@ class _SplashViewState extends State<SplashView>
                     position: _textSlide,
                     child: const Text(
                       'Seguridad ciudadana',
+                      // EPIC-14: mismo fix de contraste que en las
+                      // pantallas de login — verdeClaro sobre
+                      // blancoVerde da 2.58:1, falla AA.
                       style:
-                          TextStyle(fontSize: 14, color: AppColors.verdeClaro),
+                          TextStyle(fontSize: 14, color: AppColors.verdeTexto),
                     ),
                   ),
                 ),

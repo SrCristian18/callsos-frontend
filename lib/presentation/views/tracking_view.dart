@@ -329,25 +329,36 @@ class _TrackingViewState extends State<TrackingView> {
 }
 
 // ── Marcadores ────────────────────────────────────────────────────────────────
+//
+// EPIC-14 (accesibilidad): estos 3 widgets son `Marker.child` de
+// `flutter_map` — a diferencia de un mapa nativo (donde los marcadores
+// suelen rasterizarse a bitmap y quedan fuera del árbol de widgets),
+// `flutter_map` los renderiza como widgets Flutter normales, así que sí
+// participan del árbol de semántica. Antes de esta épica ninguno tenía
+// `Semantics`: para un lector de pantalla, el mapa entero eran 2 o 3
+// círculos de color sin ningún texto — nada que anunciar.
 
 class _MarcadorEmergencia extends StatelessWidget {
   const _MarcadorEmergencia();
 
   @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: Colors.red,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 2),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.red.withValues(alpha: 0.4),
-                blurRadius: 8,
-                spreadRadius: 2)
-          ],
+  Widget build(BuildContext context) => Semantics(
+        label: 'Ubicación de la emergencia',
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.red,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.red.withValues(alpha: 0.4),
+                  blurRadius: 8,
+                  spreadRadius: 2)
+            ],
+          ),
+          child: const Icon(Icons.emergency_share,
+              color: Colors.white, size: 22),
         ),
-        child:
-            const Icon(Icons.emergency_share, color: Colors.white, size: 22),
       );
 }
 
@@ -355,20 +366,22 @@ class _MarcadorAgente extends StatelessWidget {
   const _MarcadorAgente();
 
   @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: Colors.blue.shade700,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 2.5),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.blue.withValues(alpha: 0.4),
-                blurRadius: 8,
-                spreadRadius: 2)
-          ],
+  Widget build(BuildContext context) => Semantics(
+        label: 'Ubicación del agente',
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.blue.shade700,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2.5),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.blue.withValues(alpha: 0.4),
+                  blurRadius: 8,
+                  spreadRadius: 2)
+            ],
+          ),
+          child: const Icon(Icons.local_police, color: Colors.white, size: 24),
         ),
-        child:
-            const Icon(Icons.local_police, color: Colors.white, size: 24),
       );
 }
 
@@ -376,13 +389,16 @@ class _MarcadorDenunciante extends StatelessWidget {
   const _MarcadorDenunciante();
 
   @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: Colors.orange.shade600,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 2),
+  Widget build(BuildContext context) => Semantics(
+        label: 'Ubicación del denunciante',
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.orange.shade600,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          child: const Icon(Icons.person_pin, color: Colors.white, size: 20),
         ),
-        child: const Icon(Icons.person_pin, color: Colors.white, size: 20),
       );
 }
 

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_config.dart';
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
+import '../../data/services/notificacion_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_password_field.dart';
 import '../widgets/auth_error_banner.dart';
@@ -25,6 +27,12 @@ import '../widgets/primary_loading_button.dart';
 /// EPIC-13 (Design System, auditoría UX/UI) — error y botón de carga
 /// migrados a [AuthErrorBanner]/[PrimaryLoadingButton], unificando el
 /// tratamiento visual con [LoginView] y las demás pantallas de auth.
+///
+/// Épica 8 (hallazgo #5): tras un registro exitoso, registra el token
+/// FCM del dispositivo — antes esta vista NUNCA lo hacía, a pesar de que
+/// el backend soporta `tokenFcm` para AGENTE desde Épica 5. Mismo
+/// patrón que [RegisterDenuncianteView], vía
+/// [NotificacionService.registrarTokenEnBackend].
 class RegisterPoliciaView extends StatefulWidget {
   const RegisterPoliciaView({super.key});
 
@@ -72,6 +80,18 @@ class _RegisterPoliciaViewState extends State<RegisterPoliciaView> {
     );
 
     if (exito && mounted) {
+      // Épica 8 (hallazgo #5): registrar el token FCM tras el registro,
+      // igual que ya hace RegisterDenuncianteView. Esta vista solo
+      // registra AGENTE (ver [SesionViewModel.registrarAgente]), pero se
+      // usa el mismo despacho por rol que el resto de la app por
+      // consistencia — si `sesion.rol` no quedó seteado por algún motivo,
+      // simplemente no se llama.
+      if (AppConfig.firebaseHabilitado && sesion.rol != null) {
+        context.read<NotificacionService>().registrarTokenEnBackend(
+              actorId: sesion.actorId!,
+              rol: sesion.rol!,
+            );
+      }
       Navigator.pushReplacementNamed(context, AppRoutes.homeAgente);
     }
   }

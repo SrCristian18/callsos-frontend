@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../core/app_config.dart';
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
-import '../../data/models/enums/rol.dart';
 import '../../data/services/notificacion_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_password_field.dart';
@@ -55,11 +54,16 @@ class _LoginViewState extends State<LoginView> {
     );
 
     if (exito && mounted) {
-      // F.5 — Registrar token FCM solo si Firebase está habilitado y el
-      // rol es DENUNCIANTE (el backend solo usa tokenFcm para denunciantes).
-      if (AppConfig.firebaseHabilitado && sesion.rol == Rol.DENUNCIANTE) {
+      // F.5 — Registrar token FCM solo si Firebase está habilitado.
+      // Épica 8 (hallazgo #5): antes solo se llamaba para DENUNCIANTE
+      // ("el backend solo usa tokenFcm para denunciantes" — desactualizado
+      // desde Épica 5). Ahora se llama siempre que haya rol; el propio
+      // NotificacionService despacha al servicio correcto según el rol
+      // (o lo ignora silenciosamente si es COMANDO).
+      if (AppConfig.firebaseHabilitado && sesion.rol != null) {
         context.read<NotificacionService>().registrarTokenEnBackend(
               actorId: sesion.actorId!,
+              rol: sesion.rol!,
             );
       }
       Navigator.pushReplacementNamed(context, AppRoutes.homeDenunciante);
@@ -129,12 +133,25 @@ class _LoginViewState extends State<LoginView> {
                     child: InkWell(
                       onTap: () => Navigator.pushNamed(
                           context, AppRoutes.forgotPassword),
-                      child: const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: Text(
+                      // EPIC-14: touch target mínimo 48dp — el
+                      // `Padding(8)` de antes daba ~33dp de alto (14sp
+                      // de texto + 16 de padding), por debajo del
+                      // mínimo. `Container` con `constraints.minHeight`
+                      // agranda el área tocable sin cambiar el tamaño
+                      // visible del texto (sigue centrado adentro).
+                      child: Container(
+                        alignment: Alignment.center,
+                        constraints: const BoxConstraints(minHeight: 48),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: const Text(
                           '¿Olvidaste tu contraseña?',
+                          // EPIC-14: verdeClaro (#7EAD1F) da 2.66:1 de
+                          // contraste sobre blanco — falla AA (mínimo
+                          // 4.5:1 texto normal). verdeTexto es el mismo
+                          // verde, oscurecido para pasar AA (4.78:1),
+                          // sin tocar el swatch de marca.
                           style: TextStyle(
-                              color: AppColors.verdeClaro,
+                              color: AppColors.verdeTexto,
                               fontWeight: FontWeight.bold),
                         ),
                       ),

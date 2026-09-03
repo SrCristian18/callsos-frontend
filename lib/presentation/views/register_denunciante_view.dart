@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../core/app_config.dart';
 import '../../core/app_routes.dart';
 import '../../core/colores_app.dart';
-import '../../data/models/enums/rol.dart';
 import '../../data/services/notificacion_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_password_field.dart';
@@ -73,10 +72,12 @@ class _RegisterDenuncianteViewState extends State<RegisterDenuncianteView> {
     );
 
     if (exito && mounted) {
-      // Mismo criterio que LoginView tras un login exitoso.
-      if (AppConfig.firebaseHabilitado && sesion.rol == Rol.DENUNCIANTE) {
+      // Mismo criterio que LoginView tras un login exitoso (Épica 8,
+      // hallazgo #5 — ver su comentario para el detalle).
+      if (AppConfig.firebaseHabilitado && sesion.rol != null) {
         context.read<NotificacionService>().registrarTokenEnBackend(
               actorId: sesion.actorId!,
+              rol: sesion.rol!,
             );
       }
       Navigator.pushReplacementNamed(context, AppRoutes.homeDenunciante);

@@ -7,12 +7,15 @@ import '../../core/app_routes.dart';
 import '../../core/app_spacing.dart';
 import '../../core/app_text_styles.dart';
 import '../../core/colores_app.dart';
+import '../../data/models/actualizacion_mensaje.dart';
 import '../../data/models/enums/estado_incidente.dart';
 import '../../data/models/enums/rol.dart';
+import '../../data/models/enums/tipo_incidente_enum.dart';
 import '../../data/models/incidente.dart';
 import '../../data/models/tipo_incidente_presentacion.dart';
 import '../../data/services/api_exception.dart';
 import '../../data/services/incidente_service.dart';
+import '../../data/services/stomp_service.dart';
 import '../viewmodels/sesion_viewmodel.dart';
 import '../widgets/app_snackbar.dart';
 import '../widgets/confirmation_dialog.dart';
@@ -62,6 +65,13 @@ import '../widgets/timeline.dart';
 ///   ([ConfirmationDialog], mismo componente de EPIC-04) antes de
 ///   ejecutar — es la acción más irreversible de toda esta vista y
 ///   antes se disparaba con un solo toque, sin pedir confirmación.
+///
+/// Épica 8 (hallazgo #4): además del GET inicial, esta vista se suscribe
+/// en vivo a `/topic/incidente/{id}/actualizaciones` (mismo `IStompService`
+/// compartido vía Provider que usa `EtaWidget`/`TrackingView` — nunca una
+/// instancia propia) para reflejar sin recargar cuando el denunciante
+/// cambia el tipo desde su propia sesión. Ver `_suscribirActualizaciones`
+/// y `_onActualizacionRecibida`.
 class DetalleIncidenteView extends StatefulWidget {
   const DetalleIncidenteView({super.key});
 
@@ -92,6 +102,13 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
 
   late String _incidenteId;
 
+  /// Épica 8 (hallazgo #4): instancia COMPARTIDA vía Provider — mismo
+  /// cuidado que ya se tuvo con `EtaWidget`/`TrackingView`: jamás
+  /// instanciar `StompService` directamente acá, o se abriría una
+  /// conexión WebSocket nueva e independiente de la del resto de la app,
+  /// y ningún test podría sustituirla por un fake.
+  late final IStompService _stomp;
+
   /// FIX: sin esta guarda, `_cargar()` se disparaba en cada
   /// `didChangeDependencies()` — y ese método NO se llama una sola vez.
   /// Flutter lo vuelve a invocar cada vez que cambia una dependencia de
@@ -110,7 +127,18 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
   bool _yaCargado = false;
 
   @override
+  void initState() {
+    super.initState();
+    _stomp = context.read<IStompService>();
+  }
+
+  @override
   void dispose() {
+    // Épica 8 (hallazgo #4): cancela SOLO la(s) suscripción(es) de esta
+    // vista — no `desconectar()` el cliente completo, porque es una
+    // instancia COMPARTIDA con el resto de la app (ver `AppProviders`) y
+    // otra pantalla podría seguir necesitando la conexión.
+    _stomp.cancelarSuscripcion();
     _tabController.dispose();
     super.dispose();
   }
@@ -124,7 +152,53 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     _incidenteId = args?['incidenteId'] as String? ?? '';
-    if (_incidenteId.isNotEmpty) _cargar();
+    if (_incidenteId.isNotEmpty) {
+      _cargar();
+      _suscribirActualizaciones();
+    }
+  }
+
+  /// Épica 8 (hallazgo #4): suscribe al topic de actualizaciones en vivo
+  /// de este incidente apenas se conoce `_incidenteId`, sin esperar a que
+  /// termine el GET inicial (`_cargar()`) — ambas fuentes son
+  /// independientes, igual que en `EtaViewModel.iniciar`.
+  ///
+  /// Si la conexión STOMP falla, se ignora silenciosamente: esta
+  /// suscripción es una mejora en vivo, no una fuente de datos crítica —
+  /// el usuario siempre puede refrescar manualmente con el botón del
+  /// AppBar.
+  Future<void> _suscribirActualizaciones() async {
+    await _stomp.conectar(
+      onConnected: () {
+        if (!mounted) return;
+        _stomp.suscribirActualizaciones(
+          incidenteId: _incidenteId,
+          onMensaje: _onActualizacionRecibida,
+        );
+      },
+      onError: (_) {
+        // Silencioso a propósito — ver docstring del método.
+      },
+    );
+  }
+
+  /// Aplica un mensaje de `/topic/incidente/{id}/actualizaciones` al
+  /// `_incidente` local, SIN volver a llamar `GET /incidentes/{id}` —
+  /// ese es justo el punto de este fix (Épica 8, hallazgo #4).
+  void _onActualizacionRecibida(ActualizacionMensaje mensaje) {
+    if (!mounted || _incidente == null) return;
+    if (!mensaje.esTipoActualizado || mensaje.valorNuevo == null) return;
+
+    try {
+      final nuevoTipo = tipoIncidenteFromJson(mensaje.valorNuevo!);
+      setState(() {
+        _incidente = _incidente!.copyWith(tipo: nuevoTipo);
+      });
+    } catch (_) {
+      // Valor de tipo desconocido (desincronización front/back) —
+      // ignorar el mensaje en vez de tumbar la pantalla; el usuario
+      // siempre puede refrescar manualmente con el botón del AppBar.
+    }
   }
 
   Future<void> _cargar() async {

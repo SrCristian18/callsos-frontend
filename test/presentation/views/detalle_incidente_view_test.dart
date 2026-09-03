@@ -4,6 +4,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 
 import 'package:CallSos/core/app_routes.dart';
+import 'package:CallSos/data/models/actualizacion_mensaje.dart';
 import 'package:CallSos/data/models/auditoria_incidente.dart';
 import 'package:CallSos/data/models/auth_result.dart';
 import 'package:CallSos/data/models/enums/estado_incidente.dart';
@@ -109,11 +110,15 @@ void main() {
     auditoriaService = MockAuditoriaService();
     when(() => auditoriaService.historial(any())).thenAnswer((_) async => []);
 
-    // Stubs mínimos para que EtaWidget (si llega a montarse — solo
-    // ocurre con DENUNCIANTE + AGENTE_EN_CAMINO) no reciba llamadas sin
-    // estubear. conectar() nunca invoca onConnected/onError aquí — el
-    // test de ETA no depende de llegar a estado "conectado", solo de
-    // que el widget se construya sin lanzar una conexión WS real.
+    // Stubs mínimos para que EtaWidget y DetalleIncidenteView (que
+    // ahora también llama conectar() por sí misma — Épica 8, hallazgo
+    // #4, ver `_suscribirActualizaciones`) no reciban llamadas sin
+    // estubear. conectar() nunca invoca onConnected/onError aquí — la
+    // mayoría de los tests no dependen de llegar a estado "conectado",
+    // solo de que las vistas se construyan sin lanzar una conexión WS
+    // real. Los tests que SÍ necesitan simular la conexión (ver el
+    // grupo "Actualizaciones en vivo — Épica 8, hallazgo #4") sobre-
+    // escriben este stub puntualmente.
     stompService = MockStompService();
     when(() => stompService.conectar(
           onConnected: any(named: 'onConnected'),
@@ -211,10 +216,17 @@ void main() {
     expect(find.text('Tiempo estimado de llegada'), findsOneWidget);
     expect(find.textContaining('Ver agente en mapa'), findsNothing);
 
+    // FIX (Épica 8, hallazgo #4): antes de este hallazgo, conectar()
+    // se llamaba UNA sola vez acá — solo desde EtaWidget. Ahora
+    // DetalleIncidenteView TAMBIÉN llama conectar() por sí misma (para
+    // /actualizaciones), así que en este escenario (DENUNCIANTE +
+    // AGENTE_EN_CAMINO, donde EtaWidget se monta) hay 2 llamadas sobre
+    // la MISMA instancia compartida — no 2 conexiones WS reales, ver
+    // el fix de "conectar() ya conectado" en StompService.
     verify(() => stompService.conectar(
           onConnected: any(named: 'onConnected'),
           onError: any(named: 'onError'),
-        )).called(1);
+        )).called(2);
   });
 
   testWidgets(
@@ -796,6 +808,135 @@ void main() {
 
       final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
       expect(scaffold.bottomNavigationBar, isNull);
+    });
+  });
+
+  // Bloque 5 (Épica 8, hallazgo #4) — actualizaciones en vivo por STOMP.
+  group('Actualizaciones en vivo — Épica 8, hallazgo #4', () {
+    testWidgets('al montar la vista, conecta y se suscribe a '
+        '/topic/incidente/{id}/actualizaciones', (tester) async {
+      await loguearComo('com-001', Rol.COMANDO);
+      when(() => incidenteService.consultar('i-001'))
+          .thenAnswer((_) async => _fake('i-001', EstadoIncidente.CREADO));
+
+      // Sobrescribe el stub por defecto del setUp: esta vez SÍ simula
+      // que la conexión STOMP se establece.
+      when(() => stompService.conectar(
+            onConnected: any(named: 'onConnected'),
+            onError: any(named: 'onError'),
+          )).thenAnswer((invocacion) async {
+        final onConnected =
+            invocacion.namedArguments[#onConnected] as VoidCallback;
+        onConnected();
+      });
+      when(() => stompService.suscribirActualizaciones(
+            incidenteId: any(named: 'incidenteId'),
+            onMensaje: any(named: 'onMensaje'),
+          )).thenReturn(null);
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      verify(() => stompService.suscribirActualizaciones(
+            incidenteId: 'i-001',
+            onMensaje: any(named: 'onMensaje'),
+          )).called(1);
+    });
+
+    testWidgets('al llegar un mensaje TIPO_ACTUALIZADO, refresca el tipo '
+        'mostrado localmente SIN volver a llamar GET /incidentes/{id}',
+        (tester) async {
+      await loguearComo('com-001', Rol.COMANDO);
+      when(() => incidenteService.consultar('i-001')).thenAnswer(
+          (_) async => _fake('i-001', EstadoIncidente.DERIVADO_A_CAI));
+
+      void Function(ActualizacionMensaje)? onMensajeCapturado;
+      when(() => stompService.conectar(
+            onConnected: any(named: 'onConnected'),
+            onError: any(named: 'onError'),
+          )).thenAnswer((invocacion) async {
+        final onConnected =
+            invocacion.namedArguments[#onConnected] as VoidCallback;
+        onConnected();
+      });
+      when(() => stompService.suscribirActualizaciones(
+            incidenteId: any(named: 'incidenteId'),
+            onMensaje: any(named: 'onMensaje'),
+          )).thenAnswer((invocacion) {
+        onMensajeCapturado = invocacion.namedArguments[#onMensaje]
+            as void Function(ActualizacionMensaje);
+      });
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Robos o asaltos'), findsWidgets);
+
+      onMensajeCapturado!(const ActualizacionMensaje(
+        tipoEvento: 'TIPO_ACTUALIZADO',
+        valorAnterior: 'ROBOS_O_ASALTOS',
+        valorNuevo: 'RIÑAS_O_PELEAS',
+        timestamp: '2026-06-14T10:05:00',
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Riñas o peleas'), findsWidgets);
+      expect(find.text('Robos o asaltos'), findsNothing);
+
+      // Ni un segundo GET — el refresco fue local, sin red.
+      verify(() => incidenteService.consultar('i-001')).called(1);
+    });
+
+    testWidgets('mensaje con tipoEvento distinto de TIPO_ACTUALIZADO se '
+        'ignora, no cambia nada en pantalla', (tester) async {
+      await loguearComo('com-001', Rol.COMANDO);
+      when(() => incidenteService.consultar('i-001'))
+          .thenAnswer((_) async => _fake('i-001', EstadoIncidente.CREADO));
+
+      void Function(ActualizacionMensaje)? onMensajeCapturado;
+      when(() => stompService.conectar(
+            onConnected: any(named: 'onConnected'),
+            onError: any(named: 'onError'),
+          )).thenAnswer((invocacion) async {
+        final onConnected =
+            invocacion.namedArguments[#onConnected] as VoidCallback;
+        onConnected();
+      });
+      when(() => stompService.suscribirActualizaciones(
+            incidenteId: any(named: 'incidenteId'),
+            onMensaje: any(named: 'onMensaje'),
+          )).thenAnswer((invocacion) {
+        onMensajeCapturado = invocacion.namedArguments[#onMensaje]
+            as void Function(ActualizacionMensaje);
+      });
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      onMensajeCapturado!(const ActualizacionMensaje(
+        tipoEvento: 'OTRO_EVENTO_FUTURO',
+        timestamp: '2026-06-14T10:05:00',
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Robos o asaltos'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('al salir de la pantalla (dispose), cancela la '
+        'suscripción vía el IStompService compartido', (tester) async {
+      await loguearComo('com-001', Rol.COMANDO);
+      when(() => incidenteService.consultar('i-001'))
+          .thenAnswer((_) async => _fake('i-001', EstadoIncidente.CREADO));
+      when(() => stompService.cancelarSuscripcion()).thenReturn(null);
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      // Desmonta el árbol — dispara dispose() de DetalleIncidenteView.
+      await tester.pumpWidget(const SizedBox());
+
+      verify(() => stompService.cancelarSuscripcion()).called(1);
     });
   });
 

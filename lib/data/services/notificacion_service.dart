@@ -4,6 +4,9 @@ import 'dart:ui' show Color;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../models/enums/rol.dart';
+import '../services/agente_service.dart';
+import '../services/cai_service.dart';
 import '../services/denunciante_service.dart';
 import '../services/permiso_notificacion_service.dart';
 
@@ -57,8 +60,9 @@ const String _kCanalDesc =
 /// 1. [inicializar]: configura `flutter_local_notifications` (canal Android),
 ///    solicita permisos al usuario, y registra los handlers de FCM.
 /// 2. [registrarTokenEnBackend]: obtiene el token FCM del dispositivo y lo
-///    envía al backend (`PATCH /denunciantes/{actorId}/token`) para que el
-///    servidor pueda enviar pushes a este dispositivo.
+///    envía al backend (`PATCH /{recurso}/{actorId}/token`) para que el
+///    servidor pueda enviar pushes a este dispositivo — el recurso exacto
+///    depende del rol del actor autenticado (ver [registrarTokenEnBackend]).
 /// 3. Muestra notificaciones locales cuando la app está en **foreground**
 ///    (FCM no las muestra automáticamente en foreground — requiere
 ///    `flutter_local_notifications`).
@@ -67,26 +71,45 @@ const String _kCanalDesc =
 /// ```dart
 /// final notif = NotificacionService(
 ///   denuncianteService: context.read<IDenuncianteService>(),
+///   agenteService: context.read<IAgenteService>(),
+///   caiService: context.read<ICaiService>(),
 /// );
 /// await notif.inicializar();
-/// // Después del login del denunciante:
-/// await notif.registrarTokenEnBackend(actorId: sesion.actorId!);
+/// // Después del login/registro exitoso, para cualquier rol con soporte:
+/// await notif.registrarTokenEnBackend(actorId: sesion.actorId!, rol: sesion.rol!);
 /// ```
 ///
-/// Solo el rol [Rol.DENUNCIANTE] recibe notificaciones push en este
-/// backend — los roles policiales no tienen `tokenFcm`. Se recomienda
-/// llamar [registrarTokenEnBackend] solo cuando `sesion.rol == Rol.DENUNCIANTE`.
+/// Épica 8 (hallazgo #5): ANTES este método estaba hardcodeado contra
+/// [IDenuncianteService] únicamente — el docstring original decía "solo
+/// el rol DENUNCIANTE recibe notificaciones push en este backend", pero
+/// eso quedó desactualizado desde Épica 5: el backend expone
+/// `PATCH /agentes/{id}/token` y `PATCH /cais/{id}/token` desde entonces
+/// (`RegistrarTokenFcmAgenteService`, `RegistrarTokenFcmUnidadService`),
+/// y `NotificacionEventListener` ya intenta notificar a agente/CAI —
+/// pero como el frontend nunca registraba el token, la notificación
+/// nunca salía (falla silenciosa: `tieneTokenFcm()` protege de un crash
+/// en el backend, no hay ningún error visible en el cliente). Ahora
+/// [registrarTokenEnBackend] recibe el [Rol] del actor y despacha al
+/// servicio correcto — DENUNCIANTE, AGENTE y OPERADOR_CAI reciben push;
+/// COMANDO sigue sin tokenFcm en el backend (no hay
+/// `RegistrarTokenFcmComandoService`), así que se ignora silenciosamente.
 class NotificacionService {
   final IDenuncianteService _denuncianteService;
+  final IAgenteService _agenteService;
+  final ICaiService _caiService;
 
   final FirebaseMessaging _fcm;
   final FlutterLocalNotificationsPlugin _localNotif;
 
   NotificacionService({
     required IDenuncianteService denuncianteService,
+    required IAgenteService agenteService,
+    required ICaiService caiService,
     FirebaseMessaging? fcm,
     FlutterLocalNotificationsPlugin? localNotif,
   })  : _denuncianteService = denuncianteService,
+        _agenteService = agenteService,
+        _caiService = caiService,
         _fcm = fcm ?? FirebaseMessaging.instance,
         _localNotif = localNotif ?? FlutterLocalNotificationsPlugin();
 
@@ -219,23 +242,41 @@ class NotificacionService {
 
   // ── Registro del token en el backend ──────────────────────────────
 
-  /// Obtiene el token FCM del dispositivo y lo registra en el backend.
-  ///
-  /// `PATCH /api/v1/denunciantes/{actorId}/token` (ver F.0.3/F.0.7).
+  /// Obtiene el token FCM del dispositivo y lo registra en el backend,
+  /// en el recurso correcto según [rol] (Épica 8, hallazgo #5):
+  /// - [Rol.DENUNCIANTE] → `PATCH /denunciantes/{actorId}/token`.
+  /// - [Rol.AGENTE]      → `PATCH /agentes/{actorId}/token`.
+  /// - [Rol.OPERADOR_CAI] → `PATCH /cais/{actorId}/token` (por
+  ///   convención, el `actorId` de un OPERADOR_CAI ES el
+  ///   `unidadPolicialId` de su propio CAI — ver `ICaiService.registrarTokenFcm`).
+  /// - [Rol.COMANDO] → no-op: el backend no expone `tokenFcm` para este
+  ///   rol (no hay `RegistrarTokenFcmComandoService`). Se loggea y se
+  ///   retorna `null` sin llamar a ningún servicio ni obtener el token
+  ///   del dispositivo — no tiene sentido pedirle un token a FCM para
+  ///   luego no usarlo.
   ///
   /// IMPORTANTE — ownership: el backend valida que `actorId` del JWT
-  /// coincida con el `{id}` del path. Siempre pasar `sesion.actorId`.
+  /// coincida con el `{id}` del path en los 3 casos. Siempre pasar
+  /// `sesion.actorId` y `sesion.rol` del actor autenticado actual.
   ///
   /// Llama esta función:
-  /// - Inmediatamente después de un login exitoso de DENUNCIANTE.
+  /// - Inmediatamente después de un login/registro exitoso.
   /// - Al recibir `FirebaseMessaging.instance.onTokenRefresh` (el token
   ///   puede cambiar si el usuario reinstala la app o borra datos).
   ///
-  /// Devuelve el token registrado, o `null` si no se pudo obtener.
-  /// Nunca lanza — los errores se loggean pero no bloquean el flujo.
+  /// Devuelve el token registrado, o `null` si no se pudo obtener (o si
+  /// [rol] es [Rol.COMANDO]). Nunca lanza — los errores se loggean pero
+  /// no bloquean el flujo.
   Future<String?> registrarTokenEnBackend({
     required String actorId,
+    required Rol rol,
   }) async {
+    if (rol == Rol.COMANDO) {
+      // ignore: avoid_print
+      print('[FCM] Rol COMANDO no tiene tokenFcm en el backend — omitido.');
+      return null;
+    }
+
     try {
       final token = await _fcm.getToken();
       if (token == null || token.isEmpty) {
@@ -244,20 +285,15 @@ class NotificacionService {
         return null;
       }
 
-      await _denuncianteService.registrarTokenFcm(
-        actorId: actorId,
-        tokenFcm: token,
-      );
+      await _registrarSegunRol(actorId: actorId, rol: rol, tokenFcm: token);
 
       // ignore: avoid_print
-      print('[FCM] Token registrado en backend para actorId: $actorId');
+      print('[FCM] Token registrado en backend para actorId: $actorId '
+          '(rol: ${rol.name})');
 
       // Suscribir al refresco automático del token.
       _fcm.onTokenRefresh.listen((nuevoToken) {
-        _denuncianteService.registrarTokenFcm(
-          actorId: actorId,
-          tokenFcm: nuevoToken,
-        );
+        _registrarSegunRol(actorId: actorId, rol: rol, tokenFcm: nuevoToken);
       });
 
       return token;
@@ -265,6 +301,36 @@ class NotificacionService {
       // ignore: avoid_print
       print('[FCM] Error al registrar token: $e');
       return null;
+    }
+  }
+
+  /// Despacha al servicio de red correcto según [rol] — ver
+  /// [registrarTokenEnBackend] para el detalle de cada caso. Privado:
+  /// asume que ya se descartó [Rol.COMANDO] y que [tokenFcm] es válido.
+  Future<void> _registrarSegunRol({
+    required String actorId,
+    required Rol rol,
+    required String tokenFcm,
+  }) {
+    switch (rol) {
+      case Rol.DENUNCIANTE:
+        return _denuncianteService.registrarTokenFcm(
+          actorId: actorId,
+          tokenFcm: tokenFcm,
+        );
+      case Rol.AGENTE:
+        return _agenteService.registrarTokenFcm(
+          actorId: actorId,
+          tokenFcm: tokenFcm,
+        );
+      case Rol.OPERADOR_CAI:
+        return _caiService.registrarTokenFcm(
+          unidadPolicialId: actorId,
+          tokenFcm: tokenFcm,
+        );
+      case Rol.COMANDO:
+        // Inalcanzable — registrarTokenEnBackend ya retornó antes.
+        return Future.value();
     }
   }
 }
