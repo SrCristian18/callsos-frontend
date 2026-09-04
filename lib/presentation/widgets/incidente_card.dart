@@ -77,14 +77,24 @@ class IncidenteCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: AppRadius.borderMd,
+                Hero(
+                  // EPIC-15 (microinteracciones) — mismo ícono/color que
+                  // el de la card principal en `DetalleIncidenteView`;
+                  // el tag por id de incidente conecta visualmente CUÁL
+                  // card tocaste con el detalle que se abre (wayfinding:
+                  // "esto es lo mismo que tenías en la mano", no un
+                  // efecto porque sí). Tag único por incidente — varias
+                  // `IncidenteCard` conviven en la misma lista.
+                  tag: 'incidente-icono-${incidente.id}',
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: AppRadius.borderMd,
+                    ),
+                    child: Icon(icono, color: Colors.white, size: 26),
                   ),
-                  child: Icon(icono, color: Colors.white, size: 26),
                 ),
                 AppSpacing.gapMd,
                 Expanded(

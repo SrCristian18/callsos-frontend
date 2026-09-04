@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:provider/provider.dart';
 
 import '../../core/app_config.dart';
@@ -379,15 +380,21 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
               children: [
                 // Tipo + estado
                 Row(children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: pres?.color ?? Colors.grey,
-                      borderRadius: AppRadius.borderMd,
+                  Hero(
+                    // EPIC-15 — mismo tag que `IncidenteCard` (por id de
+                    // incidente): completa el vuelo iniciado al tocar la
+                    // card en la lista.
+                    tag: 'incidente-icono-${inc.id}',
+                    child: Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: pres?.color ?? Colors.grey,
+                        borderRadius: AppRadius.borderMd,
+                      ),
+                      child: Icon(pres?.icono ?? Icons.warning,
+                          color: Colors.white, size: 26),
                     ),
-                    child: Icon(pres?.icono ?? Icons.warning,
-                        color: Colors.white, size: 26),
                   ),
                   AppSpacing.gapMd,
                   Expanded(
@@ -592,6 +599,18 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
   /// Se renderiza en [_barraAccionPrincipal], FUERA del
   /// `SingleChildScrollView` de [_buildDetalle] — ver el comentario de
   /// clase.
+  ///
+  /// EPIC-15 (microinteracciones): "Ir en camino" y "Atender" disparan
+  /// [HapticFeedback.lightImpact] al tocarlos — son las únicas 2
+  /// acciones de esta lista que ejecutan algo con consecuencia real
+  /// (despachar/marcar la llegada de una persona) SIN pasar por
+  /// [ConfirmationDialog] primero (deliberado, ver el comentario de
+  /// clase sobre "sin fricción ni riesgo de toque accidental" —
+  /// EPIC-10). El toque físico es acá la única confirmación táctil de
+  /// "sí, se registró" que tiene el agente. "Finalizar" no lo necesita:
+  /// solo navega a `ReporteHallazgosView`, que tiene su propia
+  /// confirmación (con su propio haptic, vía `ConfirmationDialog`)
+  /// antes de hacer nada irreversible.
   Widget? _accionPrincipalAgente(
       Incidente inc, Rol? rol, IIncidenteService service) {
     if (rol != Rol.AGENTE) return null;
@@ -602,15 +621,18 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
           label: '🚓 Ir en camino',
           color: Colors.blue.shade700,
           cargando: _enProceso,
-          onPressed: () => _ejecutar(
-            () => service.enCamino(
-              inc.id,
-              simular: AppConfig.modoPruebaHabilitado && _modoPrueba,
-            ),
-            mensajeExito: _modoPrueba && AppConfig.modoPruebaHabilitado
-                ? 'Marcaste que vas en camino (simulado).'
-                : 'Marcaste que vas en camino.',
-          ),
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            _ejecutar(
+              () => service.enCamino(
+                inc.id,
+                simular: AppConfig.modoPruebaHabilitado && _modoPrueba,
+              ),
+              mensajeExito: _modoPrueba && AppConfig.modoPruebaHabilitado
+                  ? 'Marcaste que vas en camino (simulado).'
+                  : 'Marcaste que vas en camino.',
+            );
+          },
         );
 
       case EstadoIncidente.AGENTE_EN_CAMINO:
@@ -618,10 +640,13 @@ class _DetalleIncidenteViewState extends State<DetalleIncidenteView>
           label: '🏠 Llegué — Iniciar atención',
           color: Colors.indigo,
           cargando: _enProceso,
-          onPressed: () => _ejecutar(
-            () => service.atender(inc.id),
-            mensajeExito: 'Atención iniciada.',
-          ),
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            _ejecutar(
+              () => service.atender(inc.id),
+              mensajeExito: 'Atención iniciada.',
+            );
+          },
         );
 
       case EstadoIncidente.EN_ATENCION:
