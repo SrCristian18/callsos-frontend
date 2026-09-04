@@ -46,6 +46,23 @@ import 'route_guard.dart';
 class AppRoutes {
   AppRoutes._();
 
+  /// Épica 8 (hallazgo #7): permite navegar desde FUERA del árbol de
+  /// widgets — específicamente, desde el interceptor `onError` de
+  /// [ApiClient] cuando detecta un JWT expirado/inválido en medio de una
+  /// sesión activa (401 en cualquier request autenticado que no sea el
+  /// login) y necesita forzar la redirección a [roleSelection].
+  ///
+  /// Se declara ACÁ (no directamente en `main.dart`, aunque es donde
+  /// terminó pidiéndolo el hallazgo) porque tanto `main.dart`
+  /// (`MaterialApp(navigatorKey: ...)`) como `app_providers.dart`
+  /// (wiring de `ApiClient.onSesionInvalida`) ya importan este archivo
+  /// — declararla en `main.dart` habría forzado a `app_providers.dart` a
+  /// importarlo de vuelta, un ciclo (`main.dart` ya importa
+  /// `app_providers.dart`). `AppRoutes` es el punto de encuentro natural
+  /// entre ambos sin crear esa dependencia circular.
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
   static const String initial = '/';
 
   // ── Auth ────────────────────────────────────────────────────────────────

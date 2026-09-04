@@ -194,6 +194,11 @@ class MyApp extends StatelessWidget {
       // hay algo ahí (hoy no lo hay, pero es el patrón correcto).
       child: Consumer<ThemeViewModel>(
         builder: (context, temaVm, _) => MaterialApp(
+          // Épica 8 (hallazgo #7): ver docstring de `AppRoutes.navigatorKey`
+          // — permite forzar la navegación (logout automático por sesión
+          // expirada) desde el interceptor de `ApiClient`, fuera del árbol
+          // de widgets.
+          navigatorKey: AppRoutes.navigatorKey,
           title: 'CallSOS',
           debugShowCheckedModeBanner: false,
           theme: _temaClaro,

@@ -16,6 +16,9 @@ import 'package:CallSos/data/services/stomp_service.dart';
 import 'package:CallSos/presentation/viewmodels/crear_incidente_viewmodel.dart';
 import 'package:CallSos/presentation/viewmodels/sesion_viewmodel.dart';
 import 'package:CallSos/presentation/viewmodels/theme_viewmodel.dart';
+import 'package:CallSos/presentation/widgets/app_snackbar.dart';
+
+import 'app_routes.dart';
 
 /// Épica 3 (integración funcional completa): se retiraron de este archivo
 /// los providers de LoginViewModel, ReporteViewModel,
@@ -106,6 +109,45 @@ class AppProviders {
           // Conecta el JWT con ApiClient para que todas las peticiones
           // incluyan Authorization: Bearer <token>.
           apiClient.tokenProvider = sesion;
+
+          // Épica 8 (hallazgo #7): conecta el interceptor de 401 de
+          // ApiClient con SesionViewModel + la navegación forzada. Vive
+          // acá (no en SesionViewModel ni en ApiClient) porque es el
+          // único lugar que conoce a los 3 a la vez: la sesión, el
+          // cliente HTTP, y `AppRoutes.navigatorKey` para navegar sin
+          // BuildContext propio.
+          //
+          // `_manejandoSesionInvalida` evita procesar el evento más de
+          // una vez si varias peticiones en vuelo reciben 401 casi al
+          // mismo tiempo (ej. una pantalla que dispara 2-3 llamadas en
+          // paralelo) — sin esto, cada una intentaría navegar y mostrar
+          // el SnackBar por separado. Se resetea en el `finally` para
+          // que un futuro 401 (después de un nuevo login) sí se procese.
+          var manejandoSesionInvalida = false;
+          apiClient.onSesionInvalida = () async {
+            if (!sesion.isAuthenticated || manejandoSesionInvalida) return;
+            manejandoSesionInvalida = true;
+            try {
+              await sesion.manejarSesionInvalida();
+
+              final navigatorState = AppRoutes.navigatorKey.currentState;
+              final context = AppRoutes.navigatorKey.currentContext;
+              if (navigatorState == null || context == null) return;
+
+              navigatorState.pushNamedAndRemoveUntil(
+                AppRoutes.roleSelection,
+                (route) => false,
+              );
+              AppSnackBar.error(
+                context,
+                sesion.errorMessage ??
+                    'Tu sesión expiró. Inicia sesión de nuevo.',
+              );
+            } finally {
+              manejandoSesionInvalida = false;
+            }
+          };
+
           // Dispara restaurarSesion() sin bloquear el build inicial.
           sesion.restaurarSesion();
           return sesion;

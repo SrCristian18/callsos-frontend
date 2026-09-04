@@ -121,6 +121,111 @@ void main() {
     });
   });
 
+  group(
+      'ApiClient — interceptor de sesión inválida (Épica 8, hallazgo #7)',
+      () {
+    test('401 en una petición autenticada (no login) dispara onSesionInvalida',
+        () async {
+      adapter.nextStatusCode = 401;
+      adapter.nextBody = {
+        'title': 'No autorizado',
+        'status': 401,
+        'detail': 'El token JWT expiró.',
+      };
+      var disparado = false;
+      final client = ApiClient(
+        dio: dio,
+        tokenProvider: _TokenProviderFalso('jwt-expirado'),
+        onSesionInvalida: () => disparado = true,
+      );
+
+      // La llamada sigue lanzando ApiException normalmente — el
+      // interceptor NO se traga el error, solo notifica en paralelo.
+      await expectLater(
+        client.get('/incidentes/mis-incidentes'),
+        throwsA(isA<ApiException>()
+            .having((e) => e.type, 'type', ApiExceptionType.unauthorized)),
+      );
+      expect(disparado, isTrue);
+    });
+
+    test('401 en POST /auth/login (contraseña incorrecta) NO dispara '
+        'onSesionInvalida — evita el loop de login', () async {
+      adapter.nextStatusCode = 401;
+      adapter.nextBody = {
+        'title': 'No autorizado',
+        'status': 401,
+        'detail': 'Usuario o contraseña incorrectos.',
+      };
+      var disparado = false;
+      final client = ApiClient(
+        dio: dio,
+        onSesionInvalida: () => disparado = true,
+      );
+
+      await expectLater(
+        client.post('/auth/login', data: {'username': 'x', 'password': 'y'}),
+        throwsA(isA<ApiException>()
+            .having((e) => e.type, 'type', ApiExceptionType.unauthorized)),
+      );
+      expect(disparado, isFalse);
+    });
+
+    test('un error que NO es 401 no dispara onSesionInvalida', () async {
+      adapter.nextStatusCode = 404;
+      adapter.nextBody = {
+        'title': 'No encontrado',
+        'status': 404,
+        'detail': 'Incidente no encontrado.',
+      };
+      var disparado = false;
+      final client = ApiClient(
+        dio: dio,
+        tokenProvider: _TokenProviderFalso('jwt-valido'),
+        onSesionInvalida: () => disparado = true,
+      );
+
+      await expectLater(
+        client.get('/incidentes/i-404'),
+        throwsA(isA<ApiException>()),
+      );
+      expect(disparado, isFalse);
+    });
+
+    test('un 200 exitoso no dispara onSesionInvalida', () async {
+      var disparado = false;
+      final client = ApiClient(
+        dio: dio,
+        tokenProvider: _TokenProviderFalso('jwt-valido'),
+        onSesionInvalida: () => disparado = true,
+      );
+
+      await client.get('/incidentes/i-001');
+
+      expect(disparado, isFalse);
+    });
+
+    test('onSesionInvalida null (no conectado aún) no lanza al recibir un 401',
+        () async {
+      adapter.nextStatusCode = 401;
+      adapter.nextBody = {
+        'title': 'No autorizado',
+        'status': 401,
+        'detail': 'El token JWT expiró.',
+      };
+      // Sin onSesionInvalida — mismo estado que ApiClient() recién
+      // construido en AppProviders, antes de conectar el wiring.
+      final client = ApiClient(dio: dio);
+
+      await expectLater(
+        client.get('/incidentes/mis-incidentes'),
+        throwsA(isA<ApiException>()),
+      );
+      // Si esto no lanzó un error de "null check operator", el guard
+      // `onSesionInvalida?.call()` funcionó correctamente.
+    });
+  });
+
   group('ApiClient — verbos HTTP delegan correctamente a Dio', () {
     test('get() retorna response.data', () async {
       adapter.nextBody = {'id': 'i-001', 'estado': 'CREADO'};

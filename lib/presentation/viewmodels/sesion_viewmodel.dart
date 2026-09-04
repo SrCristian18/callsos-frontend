@@ -24,6 +24,12 @@ import '../../data/services/token_provider.dart';
 ///   login de nuevo.
 /// - Implementar [ITokenProvider] para que [ApiClient] (F.0.3) inyecte
 ///   automáticamente `Authorization: Bearer <token>` en cada petición.
+/// - [manejarSesionInvalida] (Épica 8, hallazgo #7): reaccionar cuando
+///   [ApiClient] detecta que el JWT dejó de ser válido EN MEDIO de una
+///   sesión activa (no al hacer login) — logout automático + mensaje
+///   claro. El wiring real con [ApiClient.onSesionInvalida] y la
+///   navegación forzada viven en `AppProviders` (necesitan
+///   `BuildContext`/`Navigator`, que este ViewModel no debe conocer).
 ///
 /// ## Cableado en `AppProviders` (ver F.0.4)
 /// ```dart
@@ -303,6 +309,32 @@ class SesionViewModel extends ChangeNotifier implements ITokenProvider {
     await _limpiarStorage();
     _limpiarEstado();
     _errorMessage = null;
+    notifyListeners();
+  }
+
+  /// Épica 8 (hallazgo #7): se invoca cuando [ApiClient] detecta un `401`
+  /// en medio de una sesión que YA estaba activa (JWT expirado, o
+  /// invalidado del lado del servidor) — a diferencia de [login], que
+  /// maneja el 401 de credenciales incorrectas al INTENTAR autenticarse.
+  ///
+  /// Limpia la sesión igual que [logout], pero además deja
+  /// [errorMessage] con un texto explicando POR QUÉ se cerró, para que
+  /// la pantalla de destino (selección de rol) lo muestre — [logout] en
+  /// cambio limpia [errorMessage] a `null`, porque un logout manual no
+  /// necesita explicación.
+  ///
+  /// Idempotente: si ya no hay sesión activa (`!isAuthenticated`), no
+  /// hace nada. Esto importa porque varias peticiones en vuelo pueden
+  /// recibir 401 casi al mismo tiempo (ej. la pantalla dispara 2-3
+  /// llamadas en paralelo) — sin esta guarda, la primera ya limpiaría la
+  /// sesión y las siguientes pisarían el mismo trabajo o, peor, el
+  /// wiring de navegación en `AppProviders` intentaría redirigir más de
+  /// una vez.
+  Future<void> manejarSesionInvalida() async {
+    if (!isAuthenticated) return;
+    await _limpiarStorage();
+    _limpiarEstado();
+    _errorMessage = 'Tu sesión expiró. Inicia sesión de nuevo.';
     notifyListeners();
   }
 

@@ -38,6 +38,9 @@ abstract class IApiClient {
 ///   `/incidentes/mis-incidentes`, etc.).
 /// - Interceptor de request: si [tokenProvider] tiene un token, agrega
 ///   `Authorization: Bearer <token>` a cada petición.
+/// - Interceptor de error (Épica 8, hallazgo #7): detecta un `401` en
+///   CUALQUIER petición autenticada (no el intento de login en sí) y
+///   dispara [onSesionInvalida] — ver docstring de ese campo.
 /// - Interceptor de logging (solo si [AppConfig.isDebug]).
 /// - Todas las excepciones de Dio (timeouts, sin conexión, HTTP 4xx/5xx) se
 ///   capturan y se relanzan como [ApiException] — la app nunca se cae por
@@ -53,7 +56,28 @@ class ApiClient implements IApiClient {
   /// con `apiClient.tokenProvider = sesionViewModel`.
   ITokenProvider? tokenProvider;
 
-  ApiClient({Dio? dio, this.tokenProvider})
+  /// Épica 8 (hallazgo #7): se invoca cuando el interceptor de error
+  /// detecta un `401 Unauthorized` en una petición que NO es el intento
+  /// de login (`POST /auth/login`) — es decir, una sesión que YA estaba
+  /// activa dejó de ser válida (JWT expirado, o invalidado del lado del
+  /// servidor). ANTES de este fix, ningún interceptor reaccionaba a este
+  /// caso: la petición simplemente fallaba con un `ApiException` que cada
+  /// pantalla manejaba (o no) por su cuenta, dejando al usuario en una
+  /// pantalla rota sin explicación.
+  ///
+  /// Se deja como callback simple (no un `Stream`) porque solo hay UN
+  /// consumidor real (`AppProviders`, que lo conecta a
+  /// `SesionViewModel.manejarSesionInvalida` + navegación) — un `Stream`
+  /// agregaría ceremonia (`StreamController`, `dispose`) sin necesidad.
+  ///
+  /// Deliberadamente NO se dispara para `/auth/login`: un 401 ahí es
+  /// "contraseña incorrecta" (ver `AuthService.login`), un caso completamente
+  /// distinto que YA maneja `SesionViewModel.login` — dispararlo también acá
+  /// causaría un loop (login falla -> se "cierra sesión" -> intenta navegar
+  /// a la pantalla de login otra vez).
+  void Function()? onSesionInvalida;
+
+  ApiClient({Dio? dio, this.tokenProvider, this.onSesionInvalida})
       : _dio = dio ??
             Dio(
               BaseOptions(
@@ -76,6 +100,12 @@ class ApiClient implements IApiClient {
           }
           handler.next(options);
         },
+        onError: (error, handler) {
+          if (_esSesionInvalida(error)) {
+            onSesionInvalida?.call();
+          }
+          handler.next(error);
+        },
       ),
     );
 
@@ -84,6 +114,20 @@ class ApiClient implements IApiClient {
         LogInterceptor(requestBody: true, responseBody: true),
       );
     }
+  }
+
+  /// `true` si [error] es un `401` en una petición que NO es el propio
+  /// intento de login — ver docstring de [onSesionInvalida].
+  ///
+  /// Compara contra `/auth/login` con `endsWith` (no `==`) porque
+  /// `RequestOptions.path` puede venir como ruta relativa (`/auth/login`)
+  /// o absoluta (`http://host/api/v1/auth/login`) según cómo Dio la haya
+  /// resuelto internamente — `endsWith` cubre ambos casos sin depender de
+  /// ese detalle de implementación.
+  bool _esSesionInvalida(DioException error) {
+    if (error.response?.statusCode != 401) return false;
+    final path = error.requestOptions.path;
+    return !path.endsWith('/auth/login');
   }
 
   @override
