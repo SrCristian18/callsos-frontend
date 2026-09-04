@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
@@ -310,6 +311,68 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => incidenteService.atender('i-001')).called(1);
+  });
+
+  group('EPIC-15 — haptic feedback en acciones críticas sin confirmación previa', () {
+    // Mismo mecanismo de captura que en confirmation_dialog_test.dart —
+    // "Ir en camino" y "Atender" son las únicas 2 acciones de esta
+    // vista que ejecutan algo consecuente SIN pasar por
+    // ConfirmationDialog antes (ver el comentario de clase de
+    // `_accionPrincipalAgente`); el toque físico es su única
+    // confirmación táctil.
+    final llamadas = <MethodCall>[];
+
+    setUp(() {
+      llamadas.clear();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        llamadas.add(call);
+        return null;
+      });
+    });
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    testWidgets('tocar "Ir en camino" dispara HapticFeedback.lightImpact',
+        (tester) async {
+      await loguearComo('ag-001', Rol.AGENTE);
+      when(() => incidenteService.consultar('i-001')).thenAnswer(
+          (_) async => _fake('i-001', EstadoIncidente.AGENTE_ASIGNADO));
+      when(() => incidenteService.enCamino('i-001')).thenAnswer((_) async {});
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.textContaining('Ir en camino'));
+      await tester.pumpAndSettle();
+
+      final vibraciones =
+          llamadas.where((c) => c.method == 'HapticFeedback.vibrate');
+      expect(vibraciones, hasLength(1));
+      expect(vibraciones.first.arguments, 'HapticFeedbackType.lightImpact');
+    });
+
+    testWidgets('tocar "Llegué — Iniciar atención" dispara HapticFeedback.lightImpact',
+        (tester) async {
+      await loguearComo('ag-001', Rol.AGENTE);
+      when(() => incidenteService.consultar('i-001')).thenAnswer(
+          (_) async => _fake('i-001', EstadoIncidente.AGENTE_EN_CAMINO));
+      when(() => incidenteService.atender('i-001')).thenAnswer((_) async {});
+
+      await tester.pumpWidget(appDePrueba(incidenteId: 'i-001'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.textContaining('Llegué'));
+      await tester.pumpAndSettle();
+
+      final vibraciones =
+          llamadas.where((c) => c.method == 'HapticFeedback.vibrate');
+      expect(vibraciones, hasLength(1));
+      expect(vibraciones.first.arguments, 'HapticFeedbackType.lightImpact');
+    });
   });
 
   testWidgets(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 
 import '../../core/colores_app.dart';
 
@@ -68,7 +69,22 @@ class ConfirmationDialog {
             style: TextButton.styleFrom(
               foregroundColor: isDangerous ? AppColors.error : AppColors.verdeOscuro,
             ),
-            onPressed: () => Navigator.pop(dialogContext, true),
+            onPressed: () {
+              // EPIC-15 (microinteracciones) — feedback táctil en la
+              // acción crítica, no en el diálogo entero: este único
+              // punto cubre TODAS las confirmaciones de la app
+              // (cerrar sesión, cancelar emergencia, enviar reporte de
+              // hallazgos) sin agregar una llamada suelta en cada
+              // pantalla. `mediumImpact` — no `heavyImpact` (se
+              // reserva para errores/alertas graves, no para una
+              // confirmación que el usuario ya decidió tocar) ni
+              // `lightImpact` (muy sutil para una acción irreversible).
+              // En dispositivos sin motor de vibración (o con la
+              // opción de sistema desactivada), `HapticFeedback` no
+              // hace nada — no hay una rama de error que manejar.
+              HapticFeedback.mediumImpact();
+              Navigator.pop(dialogContext, true);
+            },
             child: Text(
               confirmText,
               style: const TextStyle(fontWeight: FontWeight.bold),

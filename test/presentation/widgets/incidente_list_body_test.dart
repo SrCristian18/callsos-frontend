@@ -13,18 +13,20 @@ import 'package:CallSos/presentation/viewmodels/incidente_list_viewmodel.dart';
 import 'package:CallSos/presentation/widgets/empty_state.dart';
 import 'package:CallSos/presentation/widgets/error_view.dart';
 import 'package:CallSos/presentation/widgets/incidente_card.dart';
+import 'package:CallSos/presentation/widgets/incidente_card_skeleton.dart';
 import 'package:CallSos/presentation/widgets/incidente_list_body.dart';
-import 'package:CallSos/presentation/widgets/loading_view.dart';
 
 /// EPIC-09 (Design System, auditoría UX/UI) — checklist §18
 /// (loading/success/error/empty) para `IncidenteListBody`, el widget que
 /// `home_denunciante_view` (y el resto de Homes) usa para su lista.
 ///
-/// Antes de esta épica, cada uno de los 3 estados sin datos tenía acá un
-/// bloque hecho a mano; este archivo confirma que ahora ES
-/// [LoadingView]/[ErrorView]/[EmptyState] (los componentes de EPIC-03) los
-/// que se renderizan, sin cambiar ningún texto/comportamiento visible
-/// para quien usa la app.
+/// Antes de EPIC-09, cada uno de los 3 estados sin datos tenía acá un
+/// bloque hecho a mano; este archivo confirma que ahora son
+/// [ErrorView]/[EmptyState] (los componentes de EPIC-03) los que se
+/// renderizan, sin cambiar ningún texto/comportamiento visible para
+/// quien usa la app. El loading inicial, antes [LoadingView], pasó a
+/// [IncidenteListSkeleton] en EPIC-15 (microinteracciones) — ver el
+/// grupo "Loading" más abajo.
 class MockIncidenteService extends Mock implements IIncidenteService {}
 
 Incidente _fake(String id) => Incidente(
@@ -62,11 +64,22 @@ void main() {
   });
 
   group('Loading', () {
-    testWidgets('muestra LoadingView mientras carga por primera vez', (tester) async {
+    testWidgets('muestra IncidenteListSkeleton mientras carga por primera vez',
+        (tester) async {
       // Un Completer que nunca se resuelve dentro de este test deja al
       // VM "congelado" en isLoading == true — sin usar Future.delayed
       // (que arma un Timer real que flutter_test reporta como pendiente
       // si el test termina antes de que dispare).
+      //
+      // EPIC-15: el skeleton anima con `AnimationController.repeat()`
+      // (indefinido) — por eso este test usa `pump()`, NUNCA
+      // `pumpAndSettle()`, igual que se tuvo que corregir en
+      // `eta_widget_test.dart` (ver su comentario de "Regresión"): un
+      // controller que repite para siempre + `pumpAndSettle()` cuelga
+      // el test. Acá no hay riesgo real en el resto de la app porque
+      // ningún otro test deja el fetch de incidentes sin resolver
+      // mientras llama `pumpAndSettle()` — este completer es la única
+      // excepción, y por eso usa `pump()`.
       final completer = Completer<List<Incidente>>();
       when(() => service.misIncidentes()).thenAnswer((_) => completer.future);
       vm = IncidenteListViewModel(service: service, fetchFn: service.misIncidentes);
@@ -75,8 +88,8 @@ void main() {
       await tester.pumpWidget(appDePrueba());
       await tester.pump();
 
-      expect(find.byType(LoadingView), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(IncidenteListSkeleton), findsOneWidget);
+      expect(find.byType(IncidenteCardSkeleton), findsWidgets);
 
       // Resolvemos el completer para no dejar el future colgando al
       // terminar el test (aunque no use un Timer, es buena práctica).
@@ -151,7 +164,7 @@ void main() {
       await tester.pump();
 
       expect(find.byType(IncidenteCard), findsNWidgets(2));
-      expect(find.byType(LoadingView), findsNothing);
+      expect(find.byType(IncidenteListSkeleton), findsNothing);
       expect(find.byType(ErrorView), findsNothing);
       expect(find.byType(EmptyState), findsNothing);
     });
