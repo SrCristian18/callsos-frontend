@@ -252,6 +252,70 @@ void main() {
     });
   });
 
+  group('manejarSesionInvalida (Épica 8, hallazgo #7)', () {
+    test('con sesión activa: limpia estado + storage y deja un mensaje '
+        'claro en errorMessage', () async {
+      when(() => authService.login(username: 'pedro.agente', password: 'password123'))
+          .thenAnswer((_) async => const AuthResult(
+                token: 'jwt-vencido',
+                actorId: 'agente-001',
+                rol: Rol.AGENTE,
+              ));
+      await sesion.login(username: 'pedro.agente', password: 'password123');
+      expect(sesion.isAuthenticated, isTrue);
+
+      await sesion.manejarSesionInvalida();
+
+      expect(sesion.isAuthenticated, isFalse);
+      expect(sesion.token, isNull);
+      expect(sesion.actorId, isNull);
+      expect(sesion.rol, isNull);
+      expect(storage.estaVacio, isTrue);
+      expect(sesion.errorMessage, 'Tu sesión expiró. Inicia sesión de nuevo.');
+    });
+
+    test('a diferencia de logout(), SÍ deja un mensaje en errorMessage '
+        '(logout() manual lo limpia a null a propósito)', () async {
+      when(() => authService.login(username: 'pedro.agente', password: 'password123'))
+          .thenAnswer((_) async => const AuthResult(
+                token: 'jwt-valido',
+                actorId: 'agente-001',
+                rol: Rol.AGENTE,
+              ));
+      await sesion.login(username: 'pedro.agente', password: 'password123');
+
+      await sesion.manejarSesionInvalida();
+      expect(sesion.errorMessage, isNotNull);
+    });
+
+    test('idempotente: sin sesión activa, no hace nada (no limpia storage '
+        'de nuevo ni pisa un errorMessage distinto)', () async {
+      expect(sesion.isAuthenticated, isFalse);
+
+      await sesion.manejarSesionInvalida();
+
+      // No debe haber tocado nada — en particular, errorMessage sigue
+      // null (no "inventa" un mensaje si no había sesión que cerrar).
+      expect(sesion.errorMessage, isNull);
+      expect(sesion.isAuthenticated, isFalse);
+    });
+
+    test('no afecta la carga (isLoading) — es una operación silenciosa, '
+        'no debe hacer parpadear ningún spinner de la UI', () async {
+      when(() => authService.login(username: 'pedro.agente', password: 'password123'))
+          .thenAnswer((_) async => const AuthResult(
+                token: 'jwt-valido',
+                actorId: 'agente-001',
+                rol: Rol.AGENTE,
+              ));
+      await sesion.login(username: 'pedro.agente', password: 'password123');
+
+      await sesion.manejarSesionInvalida();
+
+      expect(sesion.isLoading, isFalse);
+    });
+  });
+
   group('nombreMostrar', () {
     test('cadena vacía si no hay sesión activa', () {
       expect(sesion.nombreMostrar, isEmpty);

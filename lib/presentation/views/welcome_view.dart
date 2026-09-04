@@ -37,7 +37,11 @@ class WelcomeView extends StatelessWidget {
                       "Hola, ${role.toUpperCase()}",
                       style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                     ),
-                    const Text("Bienvenido a CALL SOS", textAlign: TextAlign.center),
+                    // EPIC-16 (QA final, hallazgo #13 de la auditoría):
+                    // "CALL SOS" (mayúsculas + espacio) era la única
+                    // pantalla con esa forma — el resto de la app usa
+                    // "CallSOS" (splash, Ajustes, AppBar del Denunciante).
+                    const Text("Bienvenido a CallSOS", textAlign: TextAlign.center),
                     
                     const SizedBox(height: 50),
                     
@@ -55,7 +59,10 @@ class WelcomeView extends StatelessWidget {
                           Navigator.pushNamed(context, AppRoutes.loginDenunciante);
                         }
                       },
-                      child: const Text("Iniciar sesion", style: TextStyle(color: Colors.white)),
+                      // EPIC-16 (QA final, hallazgo #13): faltaba la
+                      // tilde — única pantalla con "Iniciar sesion" en
+                      // vez de "Iniciar sesión".
+                      child: const Text("Iniciar sesión", style: TextStyle(color: Colors.white)),
                     ),
                       
                       const SizedBox(height: 10),

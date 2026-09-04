@@ -32,10 +32,10 @@ void main() {
     expect(find.text('Hola, DENUNCIANTE'), findsOneWidget);
   });
 
-  testWidgets('con role="denunciante", "Iniciar sesion" navega a loginDenunciante', (tester) async {
+  testWidgets('con role="denunciante", "Iniciar sesión" navega a loginDenunciante', (tester) async {
     await tester.pumpWidget(appDePrueba('denunciante'));
 
-    await tester.tap(find.text('Iniciar sesion'));
+    await tester.tap(find.text('Iniciar sesión'));
     await tester.pumpAndSettle();
 
     expect(find.text('login_denunciante'), findsOneWidget);
@@ -50,10 +50,10 @@ void main() {
     expect(find.text('register_denunciante'), findsOneWidget);
   });
 
-  testWidgets('con role="policia", "Iniciar sesion" navega a loginPolicia', (tester) async {
+  testWidgets('con role="policia", "Iniciar sesión" navega a loginPolicia', (tester) async {
     await tester.pumpWidget(appDePrueba('policia'));
 
-    await tester.tap(find.text('Iniciar sesion'));
+    await tester.tap(find.text('Iniciar sesión'));
     await tester.pumpAndSettle();
 
     expect(find.text('login_policia'), findsOneWidget);
