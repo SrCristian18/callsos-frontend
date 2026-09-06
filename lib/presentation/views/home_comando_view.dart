@@ -27,28 +27,29 @@ import '../widgets/incidente_list_body.dart';
 /// que lista todos los incidentes pendientes de derivar sin filtrar
 /// por actorId — el único endpoint que tiene sentido para COMANDO.
 ///
-/// Tabs: "Reportados" (CREADO) / "Delegados" (resto).
+/// Tabs: "Reportados" (CREADO, [_vm]) / "Delegados" (historial completo
+/// de derivaciones, [_vmDelegados] — EPIC-18).
 ///
 /// EPIC-12 (Design System, auditoría UX/UI) — "Experiencia del
-/// Comandante":
-/// - "Reportados" ya hereda el Design System de EPIC-09/EPIC-11 a
-///   través de [IncidenteCard]/[IncidenteListBody] (componentes
-///   compartidos); acá se migran además el sheet de derivación
-///   ([_BottomSheetDerivar]) a los tokens de EPIC-01
-///   (`AppSpacing`/`AppRadius`/`AppTextStyles`), por consistencia.
-/// - "Delegados" reemplaza el aviso plano de antes por un panel
-///   claramente marcado como "función pendiente de backend" (ver
-///   [_avisoDelegadosPendiente]) — heurística #1 (visibilidad del
-///   estado del sistema): un tab vacío se confunde con "no hay datos
-///   todavía"; este panel dice explícitamente que la función no está
-///   construida y por qué, en vez de disfrazarla de lista vacía.
+/// Comandante": "Reportados" ya hereda el Design System de EPIC-09/
+/// EPIC-11 a través de [IncidenteCard]/[IncidenteListBody] (componentes
+/// compartidos); acá se migran además el sheet de derivación
+/// ([_BottomSheetDerivar]) a los tokens de EPIC-01
+/// (`AppSpacing`/`AppRadius`/`AppTextStyles`), por consistencia. En esa
+/// épica, "Delegados" todavía no tenía de dónde traer datos reales
+/// (hallazgo #14) — mostraba [_avisoDelegadosPendiente], un panel
+/// honesto sobre la limitación en vez de disfrazarla de lista vacía.
 ///
-/// REQUIERE CAMBIO DE BACKEND (hallazgo #14, fuera de alcance de esta
-/// épica): el historial completo de derivaciones de Comando necesita
-/// un endpoint nuevo — hoy `porEstado(CREADO)` solo trae lo pendiente
-/// de derivar; una vez derivado, el incidente desaparece de lo que
-/// Comando puede consultar. Esta épica NO intenta resolver eso — solo
-/// comunica la limitación con más claridad mientras se resuelve.
+/// EPIC-18 (backend + frontend) — resuelve el hallazgo #14: nuevo
+/// endpoint `GET /incidentes/derivados` (ver
+/// `IIncidenteService.derivados()`), con su propio
+/// [IncidenteListViewModel] independiente de [_vm] — son dos listas
+/// con datos y ciclo de vida completamente distintos (una se recarga
+/// tras derivar un incidente, la otra no), así que comparten
+/// [IncidenteListBody]/[IncidenteCard] pero NO el mismo ViewModel.
+/// [_avisoDelegadosPendiente] y su comentario de clase se retiran junto
+/// con esta épica — quedan solo en el historial de git para quien
+/// busque el porqué de una decisión anterior.
 class HomeComandoView extends StatefulWidget {
   const HomeComandoView({super.key});
 
@@ -59,6 +60,7 @@ class HomeComandoView extends StatefulWidget {
 class _HomeComandoViewState extends State<HomeComandoView>
     with SingleTickerProviderStateMixin {
   late IncidenteListViewModel _vm;
+  late IncidenteListViewModel _vmDelegados;
   late TabController _tabs;
 
   @override
@@ -73,12 +75,23 @@ class _HomeComandoViewState extends State<HomeComandoView>
       fetchFn: () => service.porEstado(EstadoIncidente.CREADO),
     );
     _vm.cargar();
+
+    // EPIC-18 — ViewModel independiente para "Delegados": misma clase
+    // (mismo checklist de loading/error/empty, mismo skeleton — EPIC-09/
+    // EPIC-15), pero una instancia propia, porque es una lista distinta
+    // con su propio ciclo de carga.
+    _vmDelegados = IncidenteListViewModel(
+      service: service,
+      fetchFn: () => service.derivados(),
+    );
+    _vmDelegados.cargar();
   }
 
   @override
   void dispose() {
     _tabs.dispose();
     _vm.dispose();
+    _vmDelegados.dispose();
     super.dispose();
   }
 
@@ -275,113 +288,34 @@ class _HomeComandoViewState extends State<HomeComandoView>
                 ),
               ),
 
-              // Tab 2 — Delegados: recarga mismos datos filtrados por estado
-              // (los ya derivados no aparecen en el fetchFn de CREADO,
-              // por eso usamos incidentesPorEstado para mostrar el historial
-              // dentro de los datos ya cargados — que incluye solo CREADO.
-              // Para un historial real de Comando se necesitaría otro endpoint.
-              // EPIC-12: ver [_avisoDelegadosPendiente] — mismo hueco de
-              // backend, presentación mejorada.)
-              _avisoDelegadosPendiente(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// EPIC-12 — panel de "Delegados", honesto sobre por qué está vacío.
-  ///
-  /// REQUIERE CAMBIO DE BACKEND (hallazgo #14): esto NO es una lista
-  /// vacía en el sentido normal ("todavía no hay datos, pero la
-  /// función funciona") — es una función que directamente no se puede
-  /// construir todavía del lado del cliente, porque el backend no
-  /// expone el endpoint que la alimentaría. Por eso NO usa
-  /// [EmptyState] (ese widget comunica "sin datos", no "sin función")
-  /// y en cambio usa un panel con estilo `AppColors.info` — visualmente
-  /// distinto tanto de un estado vacío normal como de un error real.
-  ///
-  /// La sugerencia práctica ("mirá el detalle antes de derivar") es la
-  /// MISMA limitación de siempre, solo mejor explicada: `porEstado`
-  /// solo trae `CREADO`, así que en cuanto Comando deriva un incidente,
-  /// deja de poder consultarlo desde acá — no hay ningún atajo nuevo,
-  /// solo comunicación más clara de uno ya existente.
-  Widget _avisoDelegadosPendiente() {
-    // FIX: en pantallas de test/dispositivos con poca altura disponible
-    // (el TabBarView le da a este tab una altura FIJA, no scrolleable
-    // por sí sola), este panel —bastante más alto que el aviso plano
-    // que reemplaza— podía desbordar verticalmente ("RenderFlex
-    // overflowed... bottom"). `SingleChildScrollView` es la misma
-    // salvaguarda que ya usan los demás sheets/paneles de esta vista
-    // (`_BottomSheetDerivar`, el diálogo de invitación) — si el
-    // contenido entra, se ve idéntico (`Center` sigue centrándolo
-    // cuando sobra espacio); si no entra, scrollea en vez de desbordar.
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.xxl),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Container(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            decoration: BoxDecoration(
-              color: AppColors.info.withValues(alpha: 0.08),
-              borderRadius: AppRadius.borderLg,
-              border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: const BoxDecoration(
-                    color: AppColors.info,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.construction_outlined,
-                      color: Colors.white, size: 26),
-                ),
-                AppSpacing.gapMd,
-                Text(
-                  'Historial de derivaciones — pendiente de backend',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.tituloMediano,
-                ),
-                AppSpacing.gapSm,
-                Text(
-                  'Esta pestaña va a mostrar el historial completo de '
-                  'incidentes ya derivados. Todavía no está disponible: '
-                  'requiere un endpoint adicional en el backend que hoy '
-                  'no existe (hallazgo #14 de la auditoría UX/UI).',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.cuerpoPequeno
-                      .copyWith(color: Colors.grey.shade700),
-                ),
-                AppSpacing.gapMd,
-                Divider(color: AppColors.info.withValues(alpha: 0.25)),
-                AppSpacing.gapSm,
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.lightbulb_outline,
-                        size: 16, color: AppColors.info),
-                    AppSpacing.gapSm,
-                    Expanded(
-                      child: Text(
-                        'Mientras tanto: abrí el detalle de un incidente, '
-                        'en "Reportados", ANTES de derivarlo — ahí vas a '
-                        'poder seguir su estado y su historial de '
-                        'auditoría aunque ya no aparezca en esta lista.',
-                        textAlign: TextAlign.start,
-                        style: AppTextStyles.etiqueta.copyWith(
-                          color: AppColors.info,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+              // Tab 2 — Delegados: historial real de derivaciones
+              // (EPIC-18) — ViewModel propio ([_vmDelegados]), NO el
+              // mismo `vm` del builder de arriba (ese es [_vm], de
+              // "Reportados"). `ListenableBuilder` en vez de otro
+              // `Consumer` porque [_vmDelegados] no está en el árbol de
+              // Provider (solo [_vm] lo está, vía el
+              // `ChangeNotifierProvider.value` de más abajo) — dos
+              // ChangeNotifierProvider del mismo tipo en el mismo árbol
+              // se pisarían entre sí por tipo, así que este tab escucha
+              // su propio ViewModel directamente.
+              ListenableBuilder(
+                listenable: _vmDelegados,
+                builder: (ctx, _) => IncidenteListBody(
+                  vm: _vmDelegados,
+                  incidentes: _vmDelegados.incidentes,
+                  mensajeVacio: 'Todavía no se derivó ningún incidente.',
+                  iconoVacio: Icons.history,
+                  buildCard: (i) => IncidenteCard(
+                    incidente: i,
+                    onTap: () => Navigator.pushNamed(
+                      ctx,
+                      AppRoutes.detalleIncidente,
+                      arguments: {'incidenteId': i.id},
                     ),
-                  ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

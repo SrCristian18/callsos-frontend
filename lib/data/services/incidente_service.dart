@@ -68,6 +68,16 @@ abstract class IIncidenteService {
   /// GET /incidentes/por-estado?estado={estado}
   Future<List<Incidente>> porEstado(EstadoIncidente estado);
 
+  /// EPIC-18 — `GET /incidentes/derivados`. Historial completo de
+  /// derivaciones para el tab "Delegados" de Comando: todo incidente
+  /// que en algún momento tuvo un CAI asignado, sin importar su estado
+  /// actual (activo, finalizado o cancelado luego de derivarse) — a
+  /// diferencia de [porEstado], que solo trae UN estado a la vez. Ver
+  /// el comentario del endpoint en el backend
+  /// (`IncidenteRepositoryPort.buscarDerivados()`) para el criterio
+  /// exacto de qué cuenta como "derivado".
+  Future<List<Incidente>> derivados();
+
   /// `PATCH /incidentes/{id}/estado` — cambio de estado genérico.
   ///
   /// Body: `{"nuevoEstado": "<EstadoIncidente>"}`. Usado principalmente
@@ -203,6 +213,12 @@ class IncidenteService implements IIncidenteService {
   Future<List<Incidente>> porEstado(EstadoIncidente estado) async {
     final data = await _client.get(
         '/incidentes/por-estado?estado=${estado.name}');
+    return _aListaDeIncidentes(data);
+  }
+
+  @override
+  Future<List<Incidente>> derivados() async {
+    final data = await _client.get('/incidentes/derivados');
     return _aListaDeIncidentes(data);
   }
 
