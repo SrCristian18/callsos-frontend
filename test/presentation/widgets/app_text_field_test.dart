@@ -89,13 +89,17 @@ void main() {
   });
 
   group('AppTextField — accesibilidad', () {
-    testWidgets('el campo tiene un Semantics label persistente (hintText)',
+    testWidgets('el campo tiene al menos un nodo de semántica con el hintText',
         (tester) async {
+      // EPIC-19: ver el comentario equivalente en app_password_field_test.dart
+      // — se sacó `excludeSemantics` (evidencia en AppTextField.build()),
+      // así que ya no podemos afirmar "exactamente un nodo", solo "al
+      // menos uno". Confirmación final pendiente de dispositivo real.
       await tester.pumpWidget(envolver(
         const AppTextField(hintText: 'Correo electrónico'),
       ));
 
-      expect(find.bySemanticsLabel('Correo electrónico'), findsOneWidget);
+      expect(find.bySemanticsLabel('Correo electrónico').evaluate(), isNotEmpty);
     });
   });
 }

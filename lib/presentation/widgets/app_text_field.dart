@@ -67,6 +67,18 @@ class AppTextField extends StatelessWidget {
   Widget build(BuildContext context) {
     // Mismo Semantics explícito que CustomInput, mismo motivo: hintText
     // no es un nombre accesible persistente por sí solo.
+    //
+    // EPIC-19 (verificación de accesibilidad) — CONFIRMADO, no solo
+    // inferido: se probó sacar `excludeSemantics` (la documentación de
+    // Flutter y una regla de lint de la comunidad sugerían que el
+    // patrón sin excludeSemantics era el correcto) y el resultado real
+    // en `flutter test` fue peor de lo que EPIC-14 sospechaba — no es
+    // que el label se duplique, es que DESAPARECE por completo
+    // (`find.bySemanticsLabel('...')` pasa a devolver 0 coincidencias,
+    // no 2). O sea: sin `excludeSemantics`, este campo se queda SIN
+    // ningún nombre accesible. Revertido — se queda con
+    // `excludeSemantics: true`. Documentación cerrada con evidencia de
+    // verdad, no con una suposición.
     return Semantics(
       label: hintText,
       excludeSemantics: true,
