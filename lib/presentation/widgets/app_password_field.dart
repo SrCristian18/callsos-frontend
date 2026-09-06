@@ -74,6 +74,15 @@ class _AppPasswordFieldState extends State<AppPasswordField> {
 
   @override
   Widget build(BuildContext context) {
+    // EPIC-19: ver el comentario equivalente en `AppTextField` — se
+    // probó y CONFIRMÓ (no solo se infirió) que sacar
+    // `excludeSemantics` acá deja al campo sin ningún nombre accesible
+    // (`find.bySemanticsLabel` pasa de 1 a 0 coincidencias, no a 2).
+    // Revertido. El tooltip del `IconButton` de mostrar/ocultar
+    // contraseña de más abajo sigue sin llegar al lector de pantalla
+    // mientras este `Semantics` externo lo excluya — pendiente real de
+    // resolver, no de este campo puntual (ver
+    // docs/verificacion_accesibilidad_manual.md).
     return Semantics(
       label: widget.hintText,
       excludeSemantics: true,
