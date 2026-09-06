@@ -21,17 +21,20 @@ import 'package:CallSos/presentation/views/home_comando_view.dart';
 /// Épica 5 (ruta técnica) — widget test de HomeComandoView.
 ///
 /// Particularidades frente a las otras "home": usa `porEstado(CREADO)`
-/// en vez de un endpoint por-actor (fetchFn distinto), el tab
-/// "Delegados" es un aviso estático (limitación documentada: no hay
-/// endpoint de historial para Comando todavía — no hay nada que probar
-/// ahí más allá de que el texto exista), y el ícono de llave abre un
-/// diálogo para generar invitaciones de agente (ICaiService
-/// .generarInvitacion) — flujo exclusivo de este rol.
+/// en vez de un endpoint por-actor (fetchFn distinto) para "Reportados",
+/// y el ícono de llave abre un diálogo para generar invitaciones de
+/// agente (ICaiService.generarInvitacion) — flujo exclusivo de este rol.
 ///
-/// EPIC-12 (Design System, auditoría UX/UI) — el aviso de "Delegados"
-/// se rediseñó para comunicar HONESTAMENTE que es una función pendiente
-/// de backend (hallazgo #14), no una lista vacía normal — ver el grupo
-/// "aviso 'Delegados' mejorado (EPIC-12)" más abajo.
+/// EPIC-18 (backend + frontend) — "Delegados" (hallazgo #14) pasó de
+/// ser un aviso estático ("pendiente de backend") a una
+/// `IncidenteListBody` real sobre `incidenteService.derivados()`, con
+/// su PROPIO `IncidenteListViewModel` — independiente del de
+/// "Reportados". Por eso `setUp()` stubea `derivados()` con `[]` por
+/// default para TODOS los tests (se llama en cuanto se monta la vista,
+/// sin importar qué tab esté activo — ver `initState()` de
+/// `HomeComandoView`): sin ese stub, mocktail tira `MissingStubError` y
+/// cualquier test de este archivo fallaría, no solo los que miran
+/// "Delegados" a propósito.
 class MockAuthService extends Mock implements IAuthService {}
 
 class MockIncidenteService extends Mock implements IIncidenteService {}
@@ -76,6 +79,11 @@ void main() {
           token: 'jwt-comando', actorId: 'com-001', rol: Rol.COMANDO, nombre: 'Comando Central'),
     );
     await sesion.login(username: 'com-001', password: '1234');
+
+    // EPIC-18: default para TODOS los tests — ver el comentario de
+    // archivo. Los tests que quieren datos reales en "Delegados"
+    // sobreescriben este stub localmente.
+    when(() => incidenteService.derivados()).thenAnswer((_) async => []);
   });
 
   Widget appDePrueba() {
@@ -109,106 +117,114 @@ void main() {
     expect(find.text('Comando Central'), findsOneWidget);
   });
 
-  testWidgets('tab "Delegados" muestra el aviso de limitación (sin endpoint de historial)',
-      (tester) async {
-    when(() => incidenteService.porEstado(EstadoIncidente.CREADO))
-        .thenAnswer((_) async => []);
-
-    await tester.pumpWidget(appDePrueba());
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Delegados'));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.textContaining('requiere un endpoint adicional en el backend'),
-      findsOneWidget,
-    );
-  });
-
-  // EPIC-12 — "Delegados" ahora es honesto sobre POR QUÉ está vacío: no
-  // es "todavía no hay datos" (lista vacía normal), es "esta función no
-  // está construida" (hallazgo #14, REQUIERE CAMBIO DE BACKEND).
-  group('aviso "Delegados" mejorado (EPIC-12)', () {
+  group('Tab "Delegados" (EPIC-18 — historial real de derivaciones)', () {
     testWidgets(
-        'el panel se identifica explícitamente como pendiente de backend, '
-        'no como una lista vacía', (tester) async {
+        'al montar la vista, carga derivados() además de porEstado(CREADO) '
+        '— sin importar qué tab esté visible', (tester) async {
       when(() => incidenteService.porEstado(EstadoIncidente.CREADO))
           .thenAnswer((_) async => []);
 
       await tester.pumpWidget(appDePrueba());
       await tester.pumpAndSettle();
+
+      // Tab activo sigue siendo "Reportados" — igual ya se llamó.
+      verify(() => incidenteService.derivados()).called(1);
+    });
+
+    testWidgets('muestra la lista real de incidentes derivados', (tester) async {
+      when(() => incidenteService.porEstado(EstadoIncidente.CREADO))
+          .thenAnswer((_) async => []);
+      when(() => incidenteService.derivados()).thenAnswer((_) async => [
+            _fake('i-001', EstadoIncidente.AGENTE_ASIGNADO),
+            _fake('i-002', EstadoIncidente.FINALIZADO),
+          ]);
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+
       await tester.tap(find.text('Delegados'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Historial de derivaciones — pendiente de backend'),
-          findsOneWidget);
-      expect(find.textContaining('hallazgo #14'), findsOneWidget);
-      expect(find.byIcon(Icons.construction_outlined), findsOneWidget);
+      expect(find.text('Robos o asaltos'), findsNWidgets(2));
+      // Las cards de "Delegados" NO tienen el botón "Derivar a CAI" —
+      // ya fueron derivadas, no hay nada más que hacer desde acá.
+      expect(find.text('Derivar a CAI'), findsNothing);
     });
 
-    testWidgets('el panel da una guía práctica accionable mientras tanto',
+    testWidgets('lista vacía muestra el EmptyState correcto (no el aviso viejo)',
         (tester) async {
       when(() => incidenteService.porEstado(EstadoIncidente.CREADO))
           .thenAnswer((_) async => []);
+      // derivados() → [] ya es el default de setUp().
 
       await tester.pumpWidget(appDePrueba());
       await tester.pumpAndSettle();
+
       await tester.tap(find.text('Delegados'));
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining('abrí el detalle de un incidente'),
-        findsOneWidget,
-      );
-      expect(find.byIcon(Icons.lightbulb_outline), findsOneWidget);
+      expect(find.text('Todavía no se derivó ningún incidente.'), findsOneWidget);
+      // El aviso de "pendiente de backend" de antes de EPIC-18 ya no existe.
+      expect(find.textContaining('pendiente de backend'), findsNothing);
     });
 
-    testWidgets(
-        'el aviso NO aparece en la pestaña "Reportados" (solo afecta a '
-        '"Delegados")', (tester) async {
-      when(() => incidenteService.porEstado(EstadoIncidente.CREADO))
-          .thenAnswer((_) async => [_fake('i-001', EstadoIncidente.CREADO)]);
-
-      await tester.pumpWidget(appDePrueba());
-      await tester.pumpAndSettle();
-
-      // Tab inicial es "Reportados" — el panel de "pendiente de backend"
-      // no debería estar visible acá.
-      expect(find.text('Historial de derivaciones — pendiente de backend'),
-          findsNothing);
-      expect(find.text('Derivar a CAI'), findsOneWidget);
-    });
-
-    // FIX: regresión del bug real reportado tras el primer intento de
-    // esta épica — el panel completo (ícono, título, párrafo, divider,
-    // tip) es más alto que el aviso plano de una línea que reemplazó,
-    // y el TabBarView le da a cada tab una altura FIJA (no scrolleable
-    // por sí sola). Sin `SingleChildScrollView` envolviendo el panel,
-    // esto desbordaba ("RenderFlex overflowed... 130 pixels on the
-    // bottom") en cualquier pantalla sin sobra vertical — incluido el
-    // tamaño de test por defecto. Este test fija ese escenario: una
-    // pantalla de altura reducida (menos alta que el tamaño de test
-    // default) donde el contenido NO entra sin scroll.
-    testWidgets(
-        'el panel de "Delegados" no desborda en pantallas de poca altura '
-        '(scrollea en vez de desbordar)', (tester) async {
-      tester.view.physicalSize = const Size(400, 560);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-
+    testWidgets('error de red en derivados() muestra ErrorView con "Reintentar"',
+        (tester) async {
       when(() => incidenteService.porEstado(EstadoIncidente.CREADO))
           .thenAnswer((_) async => []);
+      when(() => incidenteService.derivados()).thenThrow(
+        const ApiException(
+            type: ApiExceptionType.noConnection, message: 'Sin conexión.'),
+      );
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Delegados'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sin conexión.'), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
+    });
+
+    testWidgets('tap en una card de "Delegados" navega a DetalleIncidenteView',
+        (tester) async {
+      when(() => incidenteService.porEstado(EstadoIncidente.CREADO))
+          .thenAnswer((_) async => []);
+      when(() => incidenteService.derivados())
+          .thenAnswer((_) async => [_fake('i-001', EstadoIncidente.FINALIZADO)]);
 
       await tester.pumpWidget(appDePrueba());
       await tester.pumpAndSettle();
       await tester.tap(find.text('Delegados'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Historial de derivaciones — pendiente de backend'),
-          findsOneWidget);
-      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('Robos o asaltos').hitTestable().first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('detalle_incidente'), findsOneWidget);
+    });
+
+    testWidgets(
+        '"Reportados" y "Delegados" son listas independientes — datos de una '
+        'no aparecen en la otra', (tester) async {
+      when(() => incidenteService.porEstado(EstadoIncidente.CREADO)).thenAnswer(
+          (_) async => [_fake('i-reportado', EstadoIncidente.CREADO)]);
+      when(() => incidenteService.derivados()).thenAnswer(
+          (_) async => [_fake('i-delegado', EstadoIncidente.FINALIZADO)]);
+
+      await tester.pumpWidget(appDePrueba());
+      await tester.pumpAndSettle();
+
+      // "Reportados" (tab inicial): solo el suyo, con su botón de acción.
+      expect(find.text('Derivar a CAI'), findsOneWidget);
+
+      await tester.tap(find.text('Delegados'));
+      await tester.pumpAndSettle();
+
+      // "Delegados": el suyo, sin el botón de derivar.
+      expect(find.text('Derivar a CAI'), findsNothing);
+      expect(find.text('Robos o asaltos'), findsOneWidget);
     });
   });
 
