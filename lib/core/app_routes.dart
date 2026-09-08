@@ -9,6 +9,7 @@ import 'package:CallSos/presentation/views/login_policia_view.dart';
 import 'package:CallSos/presentation/views/register_denunciante_view.dart';
 import 'package:CallSos/presentation/views/register_policia_view.dart';
 import 'package:CallSos/presentation/views/forgot_password_view.dart';
+import 'package:CallSos/presentation/views/reset_password_view.dart';
 import 'package:CallSos/presentation/views/home_denunciante_view.dart';
 import 'package:CallSos/presentation/views/home_agente_view.dart';
 import 'package:CallSos/presentation/views/home_cai_view.dart';
@@ -74,6 +75,10 @@ class AppRoutes {
   static const String registerDenunciante = '/register_denunciante';
   static const String registerPolicia     = '/register_policia';
   static const String forgotPassword = '/forgot_password';
+  // FIX (auditoría AUD-1): paso 2 del flujo de recuperación de
+  // contraseña — no existía ninguna ruta/pantalla para completar el
+  // reseteo con el token recibido por correo (ver ResetPasswordView).
+  static const String resetPassword = '/reset_password';
 
   // ── Homes por rol ───────────────────────────────────────────────────────
   static const String homeDenunciante = '/home_denunciante';
@@ -156,6 +161,17 @@ class AppRoutes {
     registerDenunciante:  (_) => const RegisterDenuncianteView(),
     registerPolicia:      (_) => const RegisterPoliciaView(),
     forgotPassword:       (_) => const ForgotPasswordView(),
+    // FIX (auditoría AUD-1): el correo es puramente informativo (se
+    // muestra como recordatorio de a qué dirección se envió el token) —
+    // ModalRoute.of(context) es el mecanismo estándar de Flutter para
+    // leer `arguments` de Navigator.pushNamed dentro de un
+    // WidgetBuilder que no los recibe como parámetro directo.
+    resetPassword:        (context) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      return ResetPasswordView(
+        correoPrellenado: args is String ? args : null,
+      );
+    },
 
     // Homes — cada una exige el rol correspondiente (F.5, guards de rol).
     homeDenunciante:      (_) => const RouteGuard(

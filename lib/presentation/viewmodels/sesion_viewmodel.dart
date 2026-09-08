@@ -208,6 +208,7 @@ class SesionViewModel extends ChangeNotifier implements ITokenProvider {
     required String apellido,
     required String documento,
     required String telefono,
+    required String correo,
     required String password,
     required String confirmarPassword,
   }) async {
@@ -221,6 +222,7 @@ class SesionViewModel extends ChangeNotifier implements ITokenProvider {
         apellido: apellido,
         documento: documento,
         telefono: telefono,
+        correo: correo,
         password: password,
         confirmarPassword: confirmarPassword,
       );
@@ -248,6 +250,7 @@ class SesionViewModel extends ChangeNotifier implements ITokenProvider {
     required String token,
     required String nombre,
     required String telefono,
+    required String correo,
     required String username,
     required String password,
     required String confirmarPassword,
@@ -261,11 +264,86 @@ class SesionViewModel extends ChangeNotifier implements ITokenProvider {
         token: token,
         nombre: nombre,
         telefono: telefono,
+        correo: correo,
         username: username,
         password: password,
         confirmarPassword: confirmarPassword,
       );
       await _aplicarResultadoAutenticacion(resultado);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (_) {
+      _errorMessage = 'Ocurrió un error inesperado. Inténtalo de nuevo.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Solicita el envío del código/token de reseteo al correo dado —
+  /// primer paso del flujo "olvidé mi contraseña" (`POST
+  /// /auth/recuperar-password`). No afecta el estado de sesión (no hay
+  /// autologueo acá, a diferencia de [registrarDenunciante]/
+  /// [registrarAgente]).
+  ///
+  /// Devuelve el mensaje genérico del backend en éxito, o `null` si
+  /// falla (dejando [errorMessage] con el texto para mostrar). El
+  /// backend responde 200 con el mismo mensaje exista o no una cuenta
+  /// con ese correo (anti-enumeración) — la UI debe reflejar ese mensaje
+  /// tal cual, nunca inferir por su cuenta si el correo existe.
+  Future<String?> recuperarPassword({required String correo}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final mensaje = await _authService.recuperarPassword(correo: correo);
+      _isLoading = false;
+      notifyListeners();
+      return mensaje;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return null;
+    } catch (_) {
+      _errorMessage = 'Ocurrió un error inesperado. Inténtalo de nuevo.';
+      _isLoading = false;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  /// Completa el reseteo de contraseña con el token recibido por correo
+  /// — segundo paso del flujo (`POST /auth/resetear-password`). Tampoco
+  /// afecta el estado de sesión: tras un reseteo exitoso, el usuario
+  /// vuelve a la pantalla de login y se autentica con su contraseña
+  /// nueva por el camino normal ([login]), sin autologueo.
+  ///
+  /// Devuelve `true` en éxito. En error (token inválido/expirado o
+  /// contraseñas que no coinciden — HTTP 422, `businessRule`), devuelve
+  /// `false` y deja [errorMessage] con el texto del backend.
+  Future<bool> resetearPassword({
+    required String token,
+    required String nuevaPassword,
+    required String confirmarPassword,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _authService.resetearPassword(
+        token: token,
+        nuevaPassword: nuevaPassword,
+        confirmarPassword: confirmarPassword,
+      );
       _isLoading = false;
       notifyListeners();
       return true;

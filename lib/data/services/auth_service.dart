@@ -29,6 +29,7 @@ abstract class IAuthService {
     required String apellido,
     required String documento,
     required String telefono,
+    required String correo,
     required String password,
     required String confirmarPassword,
   });
@@ -40,8 +41,26 @@ abstract class IAuthService {
     required String token,
     required String nombre,
     required String telefono,
+    required String correo,
     required String username,
     required String password,
+    required String confirmarPassword,
+  });
+
+  /// Solicita un token de reseteo de contraseña por correo — espejo de
+  /// `POST /auth/recuperar-password`. El backend SIEMPRE responde 200 con
+  /// un mensaje genérico, exista o no una cuenta con ese correo (evita
+  /// enumeración de usuarios) — devuelve ese mensaje para mostrarlo tal
+  /// cual en la UI.
+  Future<String> recuperarPassword({required String correo});
+
+  /// Completa el reseteo de contraseña con el token recibido por correo
+  /// — espejo de `POST /auth/resetear-password`. Lanza [ApiException]
+  /// con `type == ApiExceptionType.businessRule` (HTTP 422) si el token
+  /// es inválido/expirado o las contraseñas no coinciden.
+  Future<String> resetearPassword({
+    required String token,
+    required String nuevaPassword,
     required String confirmarPassword,
   });
 }
@@ -87,6 +106,7 @@ class AuthService implements IAuthService {
     required String apellido,
     required String documento,
     required String telefono,
+    required String correo,
     required String password,
     required String confirmarPassword,
   }) async {
@@ -102,6 +122,7 @@ class AuthService implements IAuthService {
         'apellido': apellido,
         'documento': documento,
         'telefono': telefono,
+        'correo': correo,
         'password': password,
         'confirmarPassword': confirmarPassword,
       },
@@ -114,6 +135,7 @@ class AuthService implements IAuthService {
     required String token,
     required String nombre,
     required String telefono,
+    required String correo,
     required String username,
     required String password,
     required String confirmarPassword,
@@ -124,11 +146,38 @@ class AuthService implements IAuthService {
         'token': token,
         'nombre': nombre,
         'telefono': telefono,
+        'correo': correo,
         'username': username,
         'password': password,
         'confirmarPassword': confirmarPassword,
       },
     );
     return AuthResult.fromJson(data as Map<String, dynamic>);
+  }
+
+  @override
+  Future<String> recuperarPassword({required String correo}) async {
+    final data = await _client.post(
+      '/auth/recuperar-password',
+      data: {'correo': correo},
+    );
+    return (data as Map<String, dynamic>)['mensaje'] as String;
+  }
+
+  @override
+  Future<String> resetearPassword({
+    required String token,
+    required String nuevaPassword,
+    required String confirmarPassword,
+  }) async {
+    final data = await _client.post(
+      '/auth/resetear-password',
+      data: {
+        'token': token,
+        'nuevaPassword': nuevaPassword,
+        'confirmarPassword': confirmarPassword,
+      },
+    );
+    return (data as Map<String, dynamic>)['mensaje'] as String;
   }
 }
