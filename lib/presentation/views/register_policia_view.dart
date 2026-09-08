@@ -44,6 +44,7 @@ class _RegisterPoliciaViewState extends State<RegisterPoliciaView> {
   final _tokenController = TextEditingController();
   final _nombreController = TextEditingController();
   final _celularController = TextEditingController();
+  final _correoController = TextEditingController();
   final _usuarioController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmarPasswordController = TextEditingController();
@@ -53,6 +54,7 @@ class _RegisterPoliciaViewState extends State<RegisterPoliciaView> {
     _tokenController.dispose();
     _nombreController.dispose();
     _celularController.dispose();
+    _correoController.dispose();
     _usuarioController.dispose();
     _passwordController.dispose();
     _confirmarPasswordController.dispose();
@@ -63,6 +65,7 @@ class _RegisterPoliciaViewState extends State<RegisterPoliciaView> {
       _tokenController.text.isNotEmpty &&
       _nombreController.text.isNotEmpty &&
       _celularController.text.isNotEmpty &&
+      _correoController.text.isNotEmpty &&
       _usuarioController.text.isNotEmpty &&
       _passwordController.text.isNotEmpty &&
       _confirmarPasswordController.text.isNotEmpty;
@@ -74,6 +77,7 @@ class _RegisterPoliciaViewState extends State<RegisterPoliciaView> {
       token: _tokenController.text.trim(),
       nombre: _nombreController.text.trim(),
       telefono: _celularController.text.trim(),
+      correo: _correoController.text.trim(),
       username: _usuarioController.text.trim(),
       password: _passwordController.text,
       confirmarPassword: _confirmarPasswordController.text,
@@ -153,6 +157,11 @@ class _RegisterPoliciaViewState extends State<RegisterPoliciaView> {
                     hintText: 'Celular',
                     icon: Icons.phone_outlined,
                     controller: _celularController,
+                  ),
+                  CustomInput(
+                    hintText: 'Correo electrónico',
+                    icon: Icons.email_outlined,
+                    controller: _correoController,
                   ),
                   CustomInput(
                     hintText: 'Nombre de usuario',

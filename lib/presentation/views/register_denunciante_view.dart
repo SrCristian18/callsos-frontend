@@ -37,6 +37,7 @@ class _RegisterDenuncianteViewState extends State<RegisterDenuncianteView> {
   final _apellidoController = TextEditingController();
   final _documentoController = TextEditingController();
   final _celularController = TextEditingController();
+  final _correoController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmarPasswordController = TextEditingController();
 
@@ -46,6 +47,7 @@ class _RegisterDenuncianteViewState extends State<RegisterDenuncianteView> {
     _apellidoController.dispose();
     _documentoController.dispose();
     _celularController.dispose();
+    _correoController.dispose();
     _passwordController.dispose();
     _confirmarPasswordController.dispose();
     super.dispose();
@@ -56,6 +58,7 @@ class _RegisterDenuncianteViewState extends State<RegisterDenuncianteView> {
       _apellidoController.text.isNotEmpty &&
       _documentoController.text.isNotEmpty &&
       _celularController.text.isNotEmpty &&
+      _correoController.text.isNotEmpty &&
       _passwordController.text.isNotEmpty &&
       _confirmarPasswordController.text.isNotEmpty;
 
@@ -67,6 +70,7 @@ class _RegisterDenuncianteViewState extends State<RegisterDenuncianteView> {
       apellido: _apellidoController.text.trim(),
       documento: _documentoController.text.trim(),
       telefono: _celularController.text.trim(),
+      correo: _correoController.text.trim(),
       password: _passwordController.text,
       confirmarPassword: _confirmarPasswordController.text,
     );
@@ -136,6 +140,11 @@ class _RegisterDenuncianteViewState extends State<RegisterDenuncianteView> {
                     hintText: 'Celular',
                     icon: Icons.phone_outlined,
                     controller: _celularController,
+                  ),
+                  CustomInput(
+                    hintText: 'Correo electrónico',
+                    icon: Icons.email_outlined,
+                    controller: _correoController,
                   ),
                   AppPasswordField(
                     hintText: 'Contraseña',
