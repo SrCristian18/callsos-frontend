@@ -57,8 +57,9 @@ void main() {
     await tester.enterText(campos.at(1), 'Nueva');
     await tester.enterText(campos.at(2), '1009999999');
     await tester.enterText(campos.at(3), '3009999999');
-    await tester.enterText(campos.at(4), 'Password123');
+    await tester.enterText(campos.at(4), 'ana.nueva@test.com'); // correo
     await tester.enterText(campos.at(5), 'Password123');
+    await tester.enterText(campos.at(6), 'Password123');
   }
 
   // FIX: el formulario tiene 6 campos + ícono + título + subtítulo dentro
@@ -79,9 +80,9 @@ void main() {
     await tester.tap(boton);
   }
 
-  testWidgets('renderiza los 6 campos del formulario', (tester) async {
+  testWidgets('renderiza los 7 campos del formulario', (tester) async {
     await tester.pumpWidget(appDePrueba());
-    expect(find.byType(TextField), findsNWidgets(6));
+    expect(find.byType(TextField), findsNWidgets(7));
   });
 
   testWidgets('con campos incompletos no llama a registrarDenunciante', (tester) async {
@@ -96,6 +97,7 @@ void main() {
           apellido: any(named: 'apellido'),
           documento: any(named: 'documento'),
           telefono: any(named: 'telefono'),
+          correo: any(named: 'correo'),
           password: any(named: 'password'),
           confirmarPassword: any(named: 'confirmarPassword'),
         ));
@@ -107,6 +109,7 @@ void main() {
           apellido: 'Nueva',
           documento: '1009999999',
           telefono: '3009999999',
+          correo: 'ana.nueva@test.com',
           password: 'Password123',
           confirmarPassword: 'Password123',
         )).thenAnswer((_) async => const AuthResult(
@@ -127,6 +130,7 @@ void main() {
           apellido: any(named: 'apellido'),
           documento: any(named: 'documento'),
           telefono: any(named: 'telefono'),
+          correo: any(named: 'correo'),
           password: any(named: 'password'),
           confirmarPassword: any(named: 'confirmarPassword'),
         )).thenThrow(const ApiException(

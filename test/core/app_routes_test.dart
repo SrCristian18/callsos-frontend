@@ -18,6 +18,7 @@ import 'package:CallSos/presentation/views/login_policia_view.dart';
 import 'package:CallSos/presentation/views/register_denunciante_view.dart';
 import 'package:CallSos/presentation/views/register_policia_view.dart';
 import 'package:CallSos/presentation/views/forgot_password_view.dart';
+import 'package:CallSos/presentation/views/reset_password_view.dart';
 import 'package:CallSos/presentation/views/home_denunciante_view.dart';
 import 'package:CallSos/presentation/views/home_agente_view.dart';
 import 'package:CallSos/presentation/views/home_cai_view.dart';
@@ -81,6 +82,10 @@ void main() {
         AppRoutes.registerDenunciante: RegisterDenuncianteView,
         AppRoutes.registerPolicia: RegisterPoliciaView,
         AppRoutes.forgotPassword: ForgotPasswordView,
+        // FIX (auditoría AUD-1): paso 2 del flujo de recuperación de
+        // contraseña — mismo criterio que forgotPassword, es pre-login
+        // (no hay sesión todavía) así que tampoco lleva RouteGuard.
+        AppRoutes.resetPassword: ResetPasswordView,
         // EPIC-03 (Design System, auditoría UX/UI): solo existe en el
         // mapa cuando kDebugMode es true — `flutter test` SIEMPRE corre
         // en modo debug, así que en este test SIEMPRE está presente.
@@ -161,6 +166,7 @@ void main() {
         AppRoutes.registerDenunciante,
         AppRoutes.registerPolicia,
         AppRoutes.forgotPassword,
+        AppRoutes.resetPassword,
         AppRoutes.homeDenunciante,
         AppRoutes.homeAgente,
         AppRoutes.homeCai,
