@@ -455,7 +455,18 @@ class _BottomSheetAsignarAgenteState
                         style: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 14)),
                     Text(
-                      'Se asignará el agente disponible más cercano al incidente.',
+                      // FIX (auditoría AUD-3): el texto anterior decía
+                      // "el agente disponible más cercano al incidente",
+                      // pero el backend (AsignarAgenteService →
+                      // AgenteRepositoryMySQL.obtenerDisponiblesPorUnidad)
+                      // asigna por orden alfabético de nombre, no por
+                      // distancia — no hay cálculo de proximidad de
+                      // agentes (a diferencia de /derivar, que sí calcula
+                      // el CAI más cercano por Haversine). El texto
+                      // anterior prometía un comportamiento que el
+                      // sistema no implementa.
+                      'Se asignará automáticamente un agente disponible '
+                      'de esta unidad.',
                       style: TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                   ],
