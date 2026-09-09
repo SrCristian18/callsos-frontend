@@ -73,9 +73,10 @@ void main() {
     await tester.enterText(campos.at(0), 'token-invitacion-xyz'); // token
     await tester.enterText(campos.at(1), 'Pedro Nuevo'); // nombre
     await tester.enterText(campos.at(2), '3008888888'); // celular
-    await tester.enterText(campos.at(3), 'pedro.nuevo'); // usuario
-    await tester.enterText(campos.at(4), 'Password123'); // password
-    await tester.enterText(campos.at(5), 'Password123'); // confirmar
+    await tester.enterText(campos.at(3), 'pedro.nuevo@test.com'); // correo
+    await tester.enterText(campos.at(4), 'pedro.nuevo'); // usuario
+    await tester.enterText(campos.at(5), 'Password123'); // password
+    await tester.enterText(campos.at(6), 'Password123'); // confirmar
   }
 
   // FIX (mismo hallazgo que en register_denunciante_view_test.dart): el
@@ -90,11 +91,11 @@ void main() {
   }
 
   testWidgets(
-      'renderiza los 6 campos, incluyendo token de invitación, sin campo de CAI',
+      'renderiza los 7 campos, incluyendo token de invitación, sin campo de CAI',
       (tester) async {
     await tester.pumpWidget(appDePrueba());
 
-    expect(find.byType(TextField), findsNWidgets(6));
+    expect(find.byType(TextField), findsNWidgets(7));
     // El texto explicativo menciona el CAI (viene del token), pero no debe
     // existir NINGÚN CustomInput con hint de CAI/estación — documentado en
     // el propio código como decisión de diseño: el agente nunca lo escribe.
@@ -112,6 +113,7 @@ void main() {
           token: any(named: 'token'),
           nombre: any(named: 'nombre'),
           telefono: any(named: 'telefono'),
+          correo: any(named: 'correo'),
           username: any(named: 'username'),
           password: any(named: 'password'),
           confirmarPassword: any(named: 'confirmarPassword'),
@@ -123,6 +125,7 @@ void main() {
           token: 'token-invitacion-xyz',
           nombre: 'Pedro Nuevo',
           telefono: '3008888888',
+          correo: 'pedro.nuevo@test.com',
           username: 'pedro.nuevo',
           password: 'Password123',
           confirmarPassword: 'Password123',
@@ -143,6 +146,7 @@ void main() {
           token: any(named: 'token'),
           nombre: any(named: 'nombre'),
           telefono: any(named: 'telefono'),
+          correo: any(named: 'correo'),
           username: any(named: 'username'),
           password: any(named: 'password'),
           confirmarPassword: any(named: 'confirmarPassword'),
