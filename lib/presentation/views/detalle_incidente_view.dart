@@ -47,7 +47,9 @@ import '../widgets/timeline.dart';
 ///   → "Ver ubicación del agente" (Épica 7) → TrackingView en modo receptor.
 /// - AGENTE + AGENTE_ASIGNADO       → "Ir en camino" → PATCH /{id}/en-camino.
 /// - AGENTE + AGENTE_EN_CAMINO      → "Llegué — Atender" → PATCH /{id}/atender.
-/// - AGENTE + EN_ATENCION           → "Finalizar" → PATCH /{id}/evaluar + ReporteHallazgos.
+/// - AGENTE + EN_ATENCION           → "Finalizar" → POST /reportes/hallazgos
+///   (finaliza el incidente internamente — NUNCA se llama
+///   PATCH /{id}/evaluar por separado, ver ReporteHallazgosViewModel).
 /// - Activo + no DENUNCIANTE        → "Cancelar" → PATCH /{id}/cancelar.
 /// - DENUNCIANTE + activo            → "Cancelar emergencia".
 ///

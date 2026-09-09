@@ -13,8 +13,9 @@ import '../../data/services/incidente_service.dart';
 /// - [HomeDenuncianteView]: `() => service.misIncidentes()`
 /// - [HomeAgenteView]:      `() => service.asignados()`
 /// - [HomeCAIView]:         `() => service.porCai()`
-/// - [HomeComandoView]:     `() => service.misIncidentes()` filtrado por CREADO
-///   (no existe endpoint dedicado para Comando — ver F.0.7 gap 2).
+/// - [HomeComandoView]:     `() => service.porEstado(EstadoIncidente.CREADO)`
+///   para la cola de pendientes por derivar, y `() => service.derivados()`
+///   para el historial completo (tab "Delegados", EPIC-18).
 ///
 /// Expone:
 /// - [cargar] / [refrescar]: carga inicial vs. pull-to-refresh.
